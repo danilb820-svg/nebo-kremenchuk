@@ -1,0 +1,525 @@
+/* style.css - Адаптивний дизайн та стилі Telegram Mini App */
+
+:root {
+    --bg-color: #0f141c;
+    --card-bg: rgba(23, 32, 42, 0.85);
+    --border-color: rgba(255, 255, 255, 0.12);
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    
+    /* Кольори статусів загроз */
+    --color-default: #37474F;
+    --color-red: #E53935;
+    --color-yellow: #FDD835;
+    --color-green: #43A047;
+    
+    /* Telegram WebApp змінні за замовчуванням */
+    --tg-theme-bg-color: #0f141c;
+    --tg-theme-text-color: #ffffff;
+    --tg-theme-hint-color: #94a3b8;
+    --tg-theme-button-color: #2481cc;
+    --tg-theme-button-text-color: #ffffff;
+    --tg-theme-secondary-bg-color: #17212b;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Без вертикального скролу */
+    background-color: var(--tg-theme-bg-color, var(--bg-color));
+    color: var(--tg-theme-text-color, var(--text-primary));
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    position: relative;
+}
+
+/* Інтерактивна карта Leaflet */
+#map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background-color: #12161f;
+}
+
+/* Відключення дефолтних рамок фокусу leaflet */
+.leaflet-container {
+    background-color: #10141b !important;
+    font-family: inherit;
+}
+
+.leaflet-control-zoom {
+    display: none; /* Мобільний UX краще без зум-кнопок */
+}
+
+.leaflet-control-attribution {
+    background: rgba(15, 20, 28, 0.7) !important;
+    color: #64748b !important;
+    font-size: 9px !important;
+}
+.leaflet-control-attribution a {
+    color: #94a3b8 !important;
+}
+
+/* Верхня панель монітора */
+.app-header {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    z-index: 1000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.channel-header-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+.radar-indicator {
+    position: relative;
+    width: 12px;
+    height: 12px;
+}
+
+.radar-dot {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-color: #22c55e;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #22c55e;
+}
+
+.radar-indicator::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border: 1.5px solid #22c55e;
+    border-radius: 50%;
+    animation: radar-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes radar-ping {
+    0% {
+        transform: scale(0.8);
+        opacity: 0.9;
+    }
+    100% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+}
+
+.app-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.app-subtitle {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 1px;
+}
+
+.header-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.header-badge.active-threat {
+    background: rgba(229, 57, 53, 0.2);
+    border-color: rgba(229, 57, 53, 0.5);
+    color: #ff8583;
+}
+
+/* Легенда на карті */
+.map-legend {
+    position: absolute;
+    top: 76px;
+    left: 12px;
+    z-index: 999;
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #cbd5e1;
+}
+
+.legend-bullet {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.legend-bullet.red {
+    background-color: var(--color-red);
+    box-shadow: 0 0 8px var(--color-red);
+}
+
+.legend-bullet.yellow {
+    background-color: var(--color-yellow);
+    box-shadow: 0 0 8px var(--color-yellow);
+}
+
+.legend-bullet.grey {
+    background-color: #607d8b;
+}
+
+/* Кастомний маркер таймера району (DivIcon) */
+.alarm-timer-marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 20, 28, 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 8px;
+    padding: 4px 8px;
+    min-width: 96px;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    pointer-events: auto;
+    cursor: default;
+    border-width: 1.5px;
+    border-style: solid;
+    transition: all 0.3s ease;
+}
+
+.alarm-timer-marker.threat-red {
+    border-color: var(--color-red);
+    box-shadow: 0 0 16px rgba(229, 57, 53, 0.45);
+}
+
+.alarm-timer-marker.threat-yellow {
+    border-color: var(--color-yellow);
+    box-shadow: 0 0 16px rgba(253, 216, 53, 0.35);
+}
+
+.timer-district-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.timer-counter {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 1px;
+    white-space: nowrap;
+}
+
+.alarm-timer-marker.threat-red .timer-counter {
+    color: #ff6b6b;
+}
+
+.alarm-timer-marker.threat-yellow .timer-counter {
+    color: #ffe066;
+}
+
+/* Пульсація полігону червоної тривоги */
+@keyframes district-pulse-red {
+    0% {
+        stroke-opacity: 1;
+        stroke-width: 2.5;
+        filter: drop-shadow(0 0 2px rgba(229, 57, 53, 0.8));
+    }
+    50% {
+        stroke-opacity: 0.4;
+        stroke-width: 4.5;
+        filter: drop-shadow(0 0 10px rgba(229, 57, 53, 1));
+    }
+    100% {
+        stroke-opacity: 1;
+        stroke-width: 2.5;
+        filter: drop-shadow(0 0 2px rgba(229, 57, 53, 0.8));
+    }
+}
+
+.pulsing-district-red {
+    animation: district-pulse-red 1.8s infinite ease-in-out;
+}
+
+/* Анімація пунктирної лінії вектора */
+@keyframes dash-animation {
+    to {
+        stroke-dashoffset: -40;
+    }
+}
+
+.animated-vector-line {
+    animation: dash-animation 1.5s linear infinite;
+}
+
+/* Військовий тактичний маркер цілі (БПЛА / Ракета) */
+.military-target-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transform: translate(-16px, -16px);
+    pointer-events: none;
+}
+
+.target-head {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: 0 0 14px rgba(0, 0, 0, 0.9);
+    transition: transform 0.4s ease;
+}
+
+.target-ballistic .target-head {
+    background: #E53935;
+    box-shadow: 0 0 18px #E53935;
+}
+
+.target-shahed .target-head {
+    background: #FDD835;
+    box-shadow: 0 0 18px #FDD835;
+}
+
+.target-icon {
+    font-size: 15px;
+    line-height: 1;
+}
+
+.target-arrow {
+    position: absolute;
+    top: -9px;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.target-ballistic .target-arrow {
+    color: #ffcdd2;
+}
+
+.target-shahed .target-arrow {
+    color: #fff9c4;
+}
+
+/* Радарне пульсуюче коло навколо цілі */
+.target-radar-ping {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid;
+    animation: target-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.target-ballistic .target-radar-ping {
+    border-color: #E53935;
+}
+
+.target-shahed .target-radar-ping {
+    border-color: #FDD835;
+}
+
+@keyframes target-ping {
+    0% {
+        transform: scale(0.9);
+        opacity: 0.9;
+    }
+    100% {
+        transform: scale(2.6);
+        opacity: 0;
+    }
+}
+
+/* Плашка з характеристиками та напрямком цілі */
+.target-tag {
+    background: rgba(11, 15, 23, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 8px;
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    white-space: nowrap;
+}
+
+.target-ballistic .target-tag {
+    border-color: rgba(229, 57, 53, 0.6);
+}
+
+.target-shahed .target-tag {
+    border-color: rgba(253, 216, 53, 0.6);
+}
+
+.target-tag-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.3px;
+}
+
+.target-tag-meta {
+    font-size: 10px;
+    color: #cbd5e1;
+    display: flex;
+    gap: 6px;
+}
+
+/* Нижня плаваюча панель (Bottom Bar) */
+.bottom-bar-container {
+    position: absolute;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    right: 12px;
+    z-index: 1000;
+    background: var(--card-bg);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.55);
+}
+
+.bottom-bar-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.bottom-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+@media (min-width: 480px) {
+    .bottom-bar {
+        flex-direction: row;
+    }
+}
+
+.sim-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--tg-theme-text-color, #ffffff);
+    padding: 9px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.sim-btn:active {
+    transform: scale(0.97);
+}
+
+.sim-btn-danger {
+    background: rgba(229, 57, 53, 0.15);
+    border-color: rgba(229, 57, 53, 0.35);
+    color: #ff9997;
+}
+
+.sim-btn-danger:active {
+    background: rgba(229, 57, 53, 0.3);
+}
+
+.sim-btn-warning {
+    background: rgba(253, 216, 53, 0.15);
+    border-color: rgba(253, 216, 53, 0.35);
+    color: #ffe676;
+}
+
+.sim-btn-warning:active {
+    background: rgba(253, 216, 53, 0.3);
+}
+
+.sim-btn-neutral {
+    background: rgba(67, 160, 71, 0.15);
+    border-color: rgba(67, 160, 71, 0.35);
+    color: #a5d6a7;
+}
+
+.sim-btn-neutral:active {
+    background: rgba(67, 160, 71, 0.3);
+}
+
+.btn-icon {
+    font-size: 14px;
+}
+
+.btn-text {
+    white-space: nowrap;
+}
