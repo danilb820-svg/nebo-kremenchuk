@@ -81,25 +81,31 @@ const REGION_CENTERS = {
 };
 
 // ==========================================
-// 3. НАЛАШТУВАННЯ КАРТИ LEAFLET.JS (МАСШТАБ ТА ПОЗИЦІЯ)
+// 3. НАЛАШТУВАННЯ КАРТИ LEAFLET.JS
 // ==========================================
 const map = L.map('map', {
-    center: [48.7, 32.8],
-    zoom: 6.8,
-    minZoom: 5.5,
-    maxZoom: 12,
+    center: [48.6, 32.5],
+    zoom: 6.5,
+    minZoom: 5,
+    maxZoom: 14,
     zoomControl: false,
     attributionControl: false
 });
+
+// Темний тайловий шар основи (CartoDB Dark Matter)
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19
+}).addTo(map);
 
 // Стиль області за замовчуванням (alerts.in.ua)
 function getDefaultStyle() {
     return {
         fillColor: THREAT_COLORS.DEFAULT,
-        fillOpacity: 0.95,
+        fillOpacity: 0.92,
         color: THREAT_COLORS.DEFAULT_BORDER,
-        weight: 1.2,
-        opacity: 0.85
+        weight: 1.5,
+        opacity: 0.9
     };
 }
 
