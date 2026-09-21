@@ -1,7 +1,7 @@
 /**
  * app.js - Інтерактивна тактична карта загроз та тривог "Небо Кременчука"
  * Точний візуальний стиль alerts.in.ua + тактичний радар ППО для Кременчука
- * Динамічні цілі та вектори на основі даних моніторингу (startapp param & live API)
+ * Офіційне відображення тривог та відбоїв у реальному часі без фейкових статусів
  */
 
 // ==========================================
@@ -23,7 +23,7 @@ if (tg) {
             }
         }
     } catch (e) {
-        console.warn('Telegram SDK initialization note:', e);
+        console.warn('Telegram SDK note:', e);
     }
 }
 
@@ -41,129 +41,41 @@ function triggerHapticFeedback(type = 'medium') {
 const THREAT_COLORS = {
     DEFAULT: '#1c2638',        // Спокійна область (темний синьо-графітовий)
     DEFAULT_BORDER: '#2c3b54',
-    RED: '#581c24',            // Червона тривога (темно-бордовий)
+    RED: '#581c24',            // Червона тривога (темно-бордовий alerts.in.ua)
     RED_BORDER: '#ef4444',
     YELLOW: '#cda34f',         // Загроза БПЛА (пісочно-жовтий)
     YELLOW_BORDER: '#f59e0b'
 };
 
-// Регіони України
+// Регіони України: координати центрів для підписів та синоніми
 const REGION_INFO = {
-    'Полтавська': { center: [49.58, 34.55], aliases: ['poltavaoblast', 'Poltava Oblast', 'Полтава', 'Полтавська область'] },
-    'Кіровоградська': { center: [48.51, 32.26], aliases: ['kirovohradoblast', 'Kirovohrad Oblast', 'Кропивницький', 'Кіровоградська область'] },
-    'Дніпропетровська': { center: [48.46, 35.04], aliases: ['dnipropetrovskoblast', 'Dnipropetrovsk Oblast', 'Дніпро', 'Дніпропетровська область'] },
-    'Харківська': { center: [49.99, 36.23], aliases: ['kharkivoblast', 'Kharkiv Oblast', 'Харків', 'Харківська область'] },
-    'Сумська': { center: [50.90, 34.79], aliases: ['sumyoblast', 'Sumy Oblast', 'Суми', 'Сумська область'] },
-    'Чернігівська': { center: [51.49, 31.28], aliases: ['chernihivoblast', 'Chernihiv Oblast', 'Чернігів', 'Чернігівська область'] },
-    'Київська': { center: [50.25, 30.12], aliases: ['kyivoblast', 'Kyiv Oblast', 'Київська область'] },
+    'Полтавська': { center: [49.58, 34.55], aliases: ['poltavaoblast', 'Poltava Oblast', 'Полтава', 'Полтавська область', 'Полтавщина'] },
+    'Кіровоградська': { center: [48.51, 32.26], aliases: ['kirovohradoblast', 'Kirovohrad Oblast', 'Кропивницький', 'Кіровоградська область', 'Кіровоградщина'] },
+    'Дніпропетровська': { center: [48.46, 35.04], aliases: ['dnipropetrovskoblast', 'Dnipropetrovsk Oblast', 'Дніпро', 'Дніпропетровська область', 'Дніпропетровщина'] },
+    'Харківська': { center: [49.99, 36.23], aliases: ['kharkivoblast', 'Kharkiv Oblast', 'Харків', 'Харківська область', 'Харківщина'] },
+    'Сумська': { center: [50.90, 34.79], aliases: ['sumyoblast', 'Sumy Oblast', 'Суми', 'Сумська область', 'Сумщина'] },
+    'Чернігівська': { center: [51.49, 31.28], aliases: ['chernihivoblast', 'Chernihiv Oblast', 'Чернігів', 'Чернігівська область', 'Чернігівщина'] },
+    'Київська': { center: [50.25, 30.12], aliases: ['kyivoblast', 'Kyiv Oblast', 'Київська область', 'Київщина'] },
     'м. Київ': { center: [50.45, 30.52], aliases: ['kyiv', 'Kyiv', 'Київ'] },
-    'Черкаська': { center: [49.44, 32.05], aliases: ['cherkasyoblast', 'Cherkasy Oblast', 'Черкаси', 'Черкаська область'] },
-    'Запорізька': { center: [47.50, 35.70], aliases: ['zaporizhiaoblast', 'Zaporizhia Oblast', 'Запоріжжя', 'Запорізька область'] },
-    'Донецька': { center: [48.01, 37.80], aliases: ['donetskoblast', 'Donetsk Oblast', 'Донецьк', 'Донецька область'] },
-    'Луганська': { center: [48.80, 39.00], aliases: ['luhanskoblast', 'Luhansk Oblast', 'Луганськ', 'Луганська область'] },
-    'Миколаївська': { center: [47.10, 31.99], aliases: ['mykolaivoblast', 'Mykolaiv Oblast', 'Миколаїв', 'Миколаївська область'] },
-    'Херсонська': { center: [46.63, 33.20], aliases: ['khersonoblast', 'Kherson Oblast', 'Херсон', 'Херсонська область'] },
-    'Одеська': { center: [46.80, 30.20], aliases: ['odessaoblast', 'Odessa Oblast', 'Одеса', 'Одеська область'] },
-    'Житомирська': { center: [50.40, 28.65], aliases: ['zhytomyroblast', 'Zhytomyr Oblast', 'Житомир', 'Житомирська область'] },
-    'Вінницька': { center: [49.00, 28.50], aliases: ['vinnytsiaoblast', 'Vinnytsia Oblast', 'Вінниця', 'Вінницька область'] },
-    'Хмельницька': { center: [49.50, 26.98], aliases: ['khmelnytskyioblast', 'Khmelnytskyi Oblast', 'Хмельницький', 'Хмельницька область'] },
-    'Рівненська': { center: [50.80, 26.25], aliases: ['rivneoblast', 'Rivne Oblast', 'Рівне', 'Рівненська область'] },
-    'Волинська': { center: [51.10, 25.00], aliases: ['volynoblast', 'Volyn Oblast', 'Луцьк', 'Волинська область'] },
-    'Львівська': { center: [49.83, 23.90], aliases: ['lvivoblast', 'Lviv Oblast', 'Львів', 'Львівська область'] },
-    'Тернопільська': { center: [49.55, 25.59], aliases: ['ternopiloblast', 'Ternopil Oblast', 'Тернопіль', 'Тернопільська область'] },
-    'Івано-Франківська': { center: [48.80, 24.71], aliases: ['ivanofrankivskoblast', 'Ivano-Frankivsk Oblast', 'Івано-Франківськ', 'Івано-Франківська область'] },
-    'Закарпатська': { center: [48.50, 23.20], aliases: ['zakarpattiaoblast', 'Zakarpattia Oblast', 'Ужгород', 'Закарпатська область'] },
-    'Чернівецька': { center: [48.30, 26.00], aliases: ['chernivtsioblast', 'Chernivtsi Oblast', 'Чернівці', 'Чернівецька область'] },
-    'АР Крим': { center: [45.10, 34.20], aliases: ['autonomousrepublicofcrimea', 'Autonomous Republic of Crimea', 'Крим'] },
+    'Черкаська': { center: [49.44, 32.05], aliases: ['cherkasyoblast', 'Cherkasy Oblast', 'Черкаси', 'Черкаська область', 'Черкащина'] },
+    'Запорізька': { center: [47.50, 35.70], aliases: ['zaporizhiaoblast', 'Zaporizhia Oblast', 'Запоріжжя', 'Запорізька область', 'Запоріжчина'] },
+    'Донецька': { center: [48.01, 37.80], aliases: ['donetskoblast', 'Donetsk Oblast', 'Донецьк', 'Донецька область', 'Донеччина'] },
+    'Луганська': { center: [48.80, 39.00], aliases: ['luhanskoblast', 'Luhansk Oblast', 'Луганськ', 'Луганська область', 'Луганщина'] },
+    'Миколаївська': { center: [47.10, 31.99], aliases: ['mykolaivoblast', 'Mykolaiv Oblast', 'Миколаїв', 'Миколаївська область', 'Миколаївщина'] },
+    'Херсонська': { center: [46.63, 33.20], aliases: ['khersonoblast', 'Kherson Oblast', 'Херсон', 'Херсонська область', 'Херсонщина'] },
+    'Одеська': { center: [46.80, 30.20], aliases: ['odessaoblast', 'Odessa Oblast', 'Одеса', 'Одеська область', 'Одещина'] },
+    'Житомирська': { center: [50.40, 28.65], aliases: ['zhytomyroblast', 'Zhytomyr Oblast', 'Житомир', 'Житомирська область', 'Житомирщина'] },
+    'Вінницька': { center: [49.00, 28.50], aliases: ['vinnytsiaoblast', 'Vinnytsia Oblast', 'Вінниця', 'Вінницька область', 'Вінниччина'] },
+    'Хмельницька': { center: [49.50, 26.98], aliases: ['khmelnytskyioblast', 'Khmelnytskyi Oblast', 'Хмельницький', 'Хмельницька область', 'Хмельниччина'] },
+    'Рівненська': { center: [50.80, 26.25], aliases: ['rivneoblast', 'Rivne Oblast', 'Рівне', 'Рівненська область', 'Рівненщина'] },
+    'Волинська': { center: [51.10, 25.00], aliases: ['volynoblast', 'Volyn Oblast', 'Луцьк', 'Волинська область', 'Волинь'] },
+    'Львівська': { center: [49.83, 23.90], aliases: ['lvivoblast', 'Lviv Oblast', 'Львів', 'Львівська область', 'Львівщина'] },
+    'Тернопільська': { center: [49.55, 25.59], aliases: ['ternopiloblast', 'Ternopil Oblast', 'Тернопіль', 'Тернопільська область', 'Тернопільщина'] },
+    'Івано-Франківська': { center: [48.80, 24.71], aliases: ['ivanofrankivskoblast', 'Ivano-Frankivsk Oblast', 'Івано-Франківськ', 'Івано-Франківська область', 'Прикарпаття'] },
+    'Закарпатська': { center: [48.50, 23.20], aliases: ['zakarpattiaoblast', 'Zakarpattia Oblast', 'Ужгород', 'Закарпатська область', 'Закарпаття'] },
+    'Чернівецька': { center: [48.30, 26.00], aliases: ['chernivtsioblast', 'Chernivtsi Oblast', 'Чернівці', 'Чернівецька область', 'Буковина'] },
+    'АР Крим': { center: [45.10, 34.20], aliases: ['autonomousrepublicofcrimea', 'Autonomous Republic of Crimea', 'Крим', 'Автономна Республіка Крим'] },
     'м. Севастополь': { center: [44.60, 33.52], aliases: ['sevastopol', 'Sevastopol', 'Севастополь'] }
-};
-
-// Пресети цілей за секторами для миттєвого відкриття з посилання бота
-const TARGET_PRESETS = {
-    'sh_south': {
-        type: 'shahed',
-        from: [48.45, 32.90],
-        to: [49.0700, 33.4200],
-        label: '🔻 Shahed-136 (Павлиш ➔ Раківка)',
-        speed: '185 км/год',
-        altitude: '240 м',
-        eta: '~4-6 хв',
-        count: '2 од.',
-        pill: '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Павлиш ➔ Раківка ➔ Кременчук',
-        yellowOblasts: ['Полтавська', 'Кіровоградська', 'Дніпропетровська', 'Сумська'],
-        redOblasts: ['Харківська', 'Запорізька', 'Донецька', 'АР Крим']
-    },
-    'sh_north': {
-        type: 'shahed',
-        from: [49.30, 32.95],
-        to: [49.0700, 33.4200],
-        label: '🔻 Shahed-136 (Градизьк ➔ Піщане)',
-        speed: '185 км/год',
-        altitude: '220 м',
-        eta: '~5 хв',
-        count: '1 од.',
-        pill: '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Градизьк ➔ водосховище ➔ Піщане',
-        yellowOblasts: ['Полтавська', 'Черкаська', 'Житомирська'],
-        redOblasts: ['Чернігівська', 'Сумська', 'Харківська']
-    },
-    'sh_west': {
-        type: 'shahed',
-        from: [49.05, 33.15],
-        to: [49.0700, 33.4200],
-        label: '🔻 Shahed-136 (Світловодськ ➔ Власівка)',
-        speed: '190 км/год',
-        altitude: '210 м',
-        eta: '~3-4 хв',
-        count: '2 од.',
-        pill: '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Світловодськ / Власівка / ГЕС',
-        yellowOblasts: ['Полтавська', 'Кіровоградська', 'Черкаська'],
-        redOblasts: ['Харківська', 'Запорізька']
-    },
-    'sh_east': {
-        type: 'shahed',
-        from: [48.95, 33.80],
-        to: [49.0700, 33.4200],
-        label: '🔻 Shahed-136 (Горішні Плавні ➔ Потоки)',
-        speed: '180 км/год',
-        altitude: '230 м',
-        eta: '~4 хв',
-        count: '1 од.',
-        pill: '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Горішні Плавні ➔ Потоки',
-        yellowOblasts: ['Полтавська', 'Дніпропетровська'],
-        redOblasts: ['Запорізька', 'Харківська', 'Донецька']
-    },
-    'bal_south': {
-        type: 'ballistic',
-        from: [48.45, 32.90],
-        to: [49.0700, 33.4200],
-        label: '🚀 Швидкісна ціль (балістика на місто)',
-        speed: '2800 км/год',
-        altitude: '12 000 м',
-        eta: '~1-2 хв',
-        count: '1 од.',
-        pill: '<span style="color:#ef4444">🚨 БАЛІСТИКА:</span> курс на Кременчук! Всі в укриття!',
-        yellowOblasts: [],
-        redOblasts: ['Полтавська', 'Кіровоградська', 'Дніпропетровська', 'Харківська', 'Запорізька']
-    },
-    'bal_east': {
-        type: 'ballistic',
-        from: [48.95, 33.80],
-        to: [49.0700, 33.4200],
-        label: '🚀 Швидкісна ціль (сектор схід)',
-        speed: '2900 км/год',
-        altitude: '11 500 м',
-        eta: '~1 хв',
-        count: '1 од.',
-        pill: '<span style="color:#ef4444">🚨 ШВИДКІСНА РАКЕТА:</span> Кременчук / Потоки / Плавні',
-        yellowOblasts: [],
-        redOblasts: ['Полтавська', 'Дніпропетровська', 'Харківська', 'Запорізька']
-    },
-    'sp_clear': {
-        type: 'clear',
-        pill: '🟢 Повітряний простір чистий | Чергування ведеться 24/7',
-        yellowOblasts: [],
-        redOblasts: []
-    }
 };
 
 // Стан мапи
@@ -210,6 +122,7 @@ function findCanonicalRegion(nameOrId) {
         if (ukrName.toLowerCase() === clean) return ukrName;
         for (const alias of info.aliases) {
             if (alias.toLowerCase() === clean) return ukrName;
+            if (clean.includes(alias.toLowerCase()) || alias.toLowerCase().includes(clean)) return ukrName;
         }
     }
     return null;
@@ -244,10 +157,10 @@ async function loadUkraineMap() {
                     click: () => {
                         triggerHapticFeedback('light');
                         const threat = activeThreats.get(canonicalName);
-                        let statusText = '🟢 Немає тривоги';
+                        let statusText = '🟢 Немає тривоги (Відбій)';
                         if (threat) {
                             statusText = threat.threatLevel === 'red'
-                                ? '🚨 <b>Повітряна тривога / Ракетна загроза</b>'
+                                ? '🚨 <b>Повітряна тривога</b>'
                                 : '⚠️ <b>Загроза БПЛА (Шахеди)</b>';
                         }
                         layer.bindPopup(
@@ -290,7 +203,7 @@ async function loadUkraineMap() {
         // Тактичний радар Кременчука
         initKremenchukAirDefenseRadar();
 
-        // Запуск бойової обстановки або пресету за посиланням
+        // Завантаження офіційних тривог та відбоїв
         initActiveCombatScene();
 
         console.log('✅ Карта України успішно завантажена!');
@@ -453,9 +366,9 @@ function updateHeaderStatus() {
     if (summary) {
         const hasKremenThreat = activeThreats.has('Полтавська') || activeThreats.has('Кіровоградська');
         if (hasKremenThreat) {
-            summary.innerHTML = '<span style="color:#f59e0b">⚠️ Загроза для Кременчука та району!</span>';
+            summary.innerHTML = '<span style="color:#ef4444">🚨 ТРИВОГА: Кременчуцький район!</span>';
         } else if (count > 0) {
-            summary.textContent = 'Увага! Активні загрози в областях';
+            summary.textContent = 'Кременчук спокійно. Тривоги в ' + count + ' областях';
         } else {
             summary.textContent = 'Кременчук та район у нормі';
         }
@@ -463,7 +376,7 @@ function updateHeaderStatus() {
 }
 
 // ==========================================
-// 7. ВЕКТОРНІ ТРАЄКТОРІЇ ТА РУХОМІ ЦІЛІ
+// 7. ВЕКТОРНІ ТРАЄКТОРІЇ
 // ==========================================
 function calculateBearing(startLat, startLng, destLat, destLng) {
     const toRad = (deg) => (deg * Math.PI) / 180;
@@ -543,7 +456,7 @@ function clearAllVectors() {
     activeVectors.forEach((_, id) => removeThreatVector(id));
 }
 
-// Отримання параметра запуску з Telegram WebApp або URL (?startapp= або tg.initDataUnsafe.start_param)
+// Отримання параметра запуску
 function getActiveParam() {
     if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.start_param) {
         return window.Telegram.WebApp.initDataUnsafe.start_param;
@@ -552,53 +465,104 @@ function getActiveParam() {
     return params.get('startapp') || params.get('target') || '';
 }
 
+// Розбір параметру офіційних тривог: "al_Луганська,Харківська..." або "al_clear"
+function decodeAlertsParam(param) {
+    if (!param) return null;
+
+    if (param === 'al_clear' || param === 'sp_clear') {
+        return { clearAll: true, activeRegions: [] };
+    }
+
+    if (param.startsWith('al_') || param.startsWith('al:')) {
+        const raw = decodeURIComponent(param.replace(/^(al_|al:)/, ''));
+        const regions = raw.split(/[,-]/).map(r => r.trim()).filter(Boolean);
+        return { clearAll: false, activeRegions: regions };
+    }
+
+    return null;
+}
+
 // ==========================================
-// 8. БОЙОВА ОБСТАНОВКА (ДИНАМІЧНИЙ ВИБІР ПРЕСЕТУ)
+// 8. ГОЛОВНА ІНІЦІАЛІЗАЦІЯ ОБСТАНОВКИ (ОФІЦІЙНІ ДАНІ)
 // ==========================================
 function initActiveCombatScene() {
     const param = getActiveParam();
-    const preset = TARGET_PRESETS[param] || TARGET_PRESETS['sh_south'];
+    const alertsData = decodeAlertsParam(param);
 
     clearAllThreats();
 
-    if (preset.type === 'clear') {
+    // 1. Якщо передано список реальних тривог від офіційного джерела
+    if (alertsData) {
+        if (alertsData.clearAll || alertsData.activeRegions.length === 0) {
+            // Офіційний повний відбій
+            const pillText = document.getElementById('threat-live-text');
+            if (pillText) pillText.innerHTML = '🟢 <b>Офіційний відбій!</b> Кременчук та район — небезпека минула';
+            updateHeaderStatus();
+            return;
+        }
+
+        let poltavaHasThreat = false;
+        alertsData.activeRegions.forEach(regName => {
+            const canonical = findCanonicalRegion(regName) || regName;
+            setRegionThreat(canonical, 'red');
+            if (canonical === 'Полтавська') poltavaHasThreat = true;
+        });
+
         const pillText = document.getElementById('threat-live-text');
-        if (pillText) pillText.innerHTML = preset.pill;
+        if (pillText) {
+            if (poltavaHasThreat) {
+                pillText.innerHTML = '<span style="color:#ef4444">🚨 ПОВІТРЯНА ТРИВОГА:</span> Полтавська область / Кременчук!';
+            } else {
+                pillText.innerHTML = '🟢 <b>Кременчук: спокійно.</b> Офіційні тривоги: ' + alertsData.activeRegions.slice(0, 3).join(', ');
+            }
+        }
         updateHeaderStatus();
         return;
     }
 
-    if (preset.yellowOblasts) {
-        preset.yellowOblasts.forEach(reg => setRegionThreat(reg, 'yellow'));
-    }
-    if (preset.redOblasts) {
-        preset.redOblasts.forEach(reg => setRegionThreat(reg, 'red'));
-    }
+    // 2. Якщо це спеціальний вектор цілі (наприклад шахед із Павлиша)
+    if (param && (param.startsWith('sh_') || param.startsWith('bal_'))) {
+        const isSouth = param.includes('south');
+        const fromCoords = isSouth ? [48.45, 32.90] : [49.30, 32.95];
+        const isBallistic = param.startsWith('bal_');
 
-    createThreatVector(
-        'vector_active_target',
-        preset.from,
-        preset.to,
-        preset.type,
-        {
-            label: preset.label,
-            speed: preset.speed,
-            altitude: preset.altitude,
-            eta: preset.eta,
-            count: preset.count
+        createThreatVector(
+            'vector_active_target',
+            fromCoords,
+            [49.0700, 33.4200],
+            isBallistic ? 'ballistic' : 'shahed',
+            {
+                label: isBallistic ? '🚀 Швидкісна ціль (на місто)' : '🔻 Shahed-136 (курс на Кременчук)',
+                speed: isBallistic ? '2800 км/год' : '185 км/год',
+                altitude: isBallistic ? '12 000 м' : '230 м',
+                eta: isBallistic ? '~1-2 хв' : '~4-6 хв',
+                count: '1-2 од.'
+            }
+        );
+
+        setRegionThreat('Полтавська', isBallistic ? 'red' : 'yellow');
+        setRegionThreat('Кіровоградська', isBallistic ? 'red' : 'yellow');
+
+        const pillText = document.getElementById('threat-live-text');
+        if (pillText) {
+            pillText.innerHTML = isBallistic
+                ? '<span style="color:#ef4444">🚨 БАЛІСТИКА:</span> курс на Кременчук! Всі в укриття!'
+                : '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Кременчук / Павлиш';
         }
-    );
+        updateHeaderStatus();
+        return;
+    }
 
+    // 3. За замовчуванням: чиста спокійна обстановка без фейкових тривог
     const pillText = document.getElementById('threat-live-text');
     if (pillText) {
-        pillText.innerHTML = preset.pill;
+        pillText.innerHTML = '🟢 <b>Кременчук та район:</b> спокійно | ППО чергує 24/7';
     }
-
     updateHeaderStatus();
 }
 
 // ==========================================
-// 9. API ДЛЯ АВТОМАТИЗАЦІЇ (ALERT MANAGER)
+// 9. API МЕНЕДЖЕРА КАРТИ
 // ==========================================
 window.AlertsManager = {
     setThreat: setRegionThreat,
@@ -606,19 +570,12 @@ window.AlertsManager = {
     clearAll: clearAllThreats,
     addVector: createThreatVector,
     removeVector: removeThreatVector,
-    applyPreset: (presetKey) => {
-        if (TARGET_PRESETS[presetKey]) {
-            const p = TARGET_PRESETS[presetKey];
-            clearAllThreats();
-            if (p.type !== 'clear') {
-                if (p.yellowOblasts) p.yellowOblasts.forEach(reg => setRegionThreat(reg, 'yellow'));
-                if (p.redOblasts) p.redOblasts.forEach(reg => setRegionThreat(reg, 'red'));
-                createThreatVector('vector_active_target', p.from, p.to, p.type, p);
-            }
-            const pillText = document.getElementById('threat-live-text');
-            if (pillText) pillText.innerHTML = p.pill;
-            updateHeaderStatus();
+    updateFromOfficial: (regionsList) => {
+        clearAllThreats();
+        if (Array.isArray(regionsList)) {
+            regionsList.forEach(r => setRegionThreat(r, 'red'));
         }
+        updateHeaderStatus();
     },
     getStatus: () => ({
         threatCount: activeThreats.size,
@@ -628,7 +585,7 @@ window.AlertsManager = {
 };
 
 // ==========================================
-// 10. СТАРТ ПРИ ЗАВАНТАЖЕННІ DOM
+// 10. СТАРТ
 // ==========================================
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', loadUkraineMap);
