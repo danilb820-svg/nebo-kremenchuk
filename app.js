@@ -1,6 +1,7 @@
 /**
  * app.js - Інтерактивна тактична карта загроз та тривог "Небо Кременчука"
  * Точний візуальний стиль alerts.in.ua + тактичний радар ППО для Кременчука
+ * Динамічні цілі та вектори на основі даних моніторингу (startapp param & live API)
  */
 
 // ==========================================
@@ -46,7 +47,7 @@ const THREAT_COLORS = {
     YELLOW_BORDER: '#f59e0b'
 };
 
-// Регіони України: координати центрів для підписів та синоніми
+// Регіони України
 const REGION_INFO = {
     'Полтавська': { center: [49.58, 34.55], aliases: ['poltavaoblast', 'Poltava Oblast', 'Полтава', 'Полтавська область'] },
     'Кіровоградська': { center: [48.51, 32.26], aliases: ['kirovohradoblast', 'Kirovohrad Oblast', 'Кропивницький', 'Кіровоградська область'] },
@@ -75,6 +76,94 @@ const REGION_INFO = {
     'Чернівецька': { center: [48.30, 26.00], aliases: ['chernivtsioblast', 'Chernivtsi Oblast', 'Чернівці', 'Чернівецька область'] },
     'АР Крим': { center: [45.10, 34.20], aliases: ['autonomousrepublicofcrimea', 'Autonomous Republic of Crimea', 'Крим'] },
     'м. Севастополь': { center: [44.60, 33.52], aliases: ['sevastopol', 'Sevastopol', 'Севастополь'] }
+};
+
+// Пресети цілей за секторами для миттєвого відкриття з посилання бота
+const TARGET_PRESETS = {
+    'sh_south': {
+        type: 'shahed',
+        from: [48.45, 32.90],
+        to: [49.0700, 33.4200],
+        label: '🔻 Shahed-136 (Павлиш ➔ Раківка)',
+        speed: '185 км/год',
+        altitude: '240 м',
+        eta: '~4-6 хв',
+        count: '2 од.',
+        pill: '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Павлиш ➔ Раківка ➔ Кременчук',
+        yellowOblasts: ['Полтавська', 'Кіровоградська', 'Дніпропетровська', 'Сумська'],
+        redOblasts: ['Харківська', 'Запорізька', 'Донецька', 'АР Крим']
+    },
+    'sh_north': {
+        type: 'shahed',
+        from: [49.30, 32.95],
+        to: [49.0700, 33.4200],
+        label: '🔻 Shahed-136 (Градизьк ➔ Піщане)',
+        speed: '185 км/год',
+        altitude: '220 м',
+        eta: '~5 хв',
+        count: '1 од.',
+        pill: '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Градизьк ➔ водосховище ➔ Піщане',
+        yellowOblasts: ['Полтавська', 'Черкаська', 'Житомирська'],
+        redOblasts: ['Чернігівська', 'Сумська', 'Харківська']
+    },
+    'sh_west': {
+        type: 'shahed',
+        from: [49.05, 33.15],
+        to: [49.0700, 33.4200],
+        label: '🔻 Shahed-136 (Світловодськ ➔ Власівка)',
+        speed: '190 км/год',
+        altitude: '210 м',
+        eta: '~3-4 хв',
+        count: '2 од.',
+        pill: '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Світловодськ / Власівка / ГЕС',
+        yellowOblasts: ['Полтавська', 'Кіровоградська', 'Черкаська'],
+        redOblasts: ['Харківська', 'Запорізька']
+    },
+    'sh_east': {
+        type: 'shahed',
+        from: [48.95, 33.80],
+        to: [49.0700, 33.4200],
+        label: '🔻 Shahed-136 (Горішні Плавні ➔ Потоки)',
+        speed: '180 км/год',
+        altitude: '230 м',
+        eta: '~4 хв',
+        count: '1 од.',
+        pill: '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Горішні Плавні ➔ Потоки',
+        yellowOblasts: ['Полтавська', 'Дніпропетровська'],
+        redOblasts: ['Запорізька', 'Харківська', 'Донецька']
+    },
+    'bal_south': {
+        type: 'ballistic',
+        from: [48.45, 32.90],
+        to: [49.0700, 33.4200],
+        label: '🚀 Швидкісна ціль (балістика на місто)',
+        speed: '2800 км/год',
+        altitude: '12 000 м',
+        eta: '~1-2 хв',
+        count: '1 од.',
+        pill: '<span style="color:#ef4444">🚨 БАЛІСТИКА:</span> курс на Кременчук! Всі в укриття!',
+        yellowOblasts: [],
+        redOblasts: ['Полтавська', 'Кіровоградська', 'Дніпропетровська', 'Харківська', 'Запорізька']
+    },
+    'bal_east': {
+        type: 'ballistic',
+        from: [48.95, 33.80],
+        to: [49.0700, 33.4200],
+        label: '🚀 Швидкісна ціль (сектор схід)',
+        speed: '2900 км/год',
+        altitude: '11 500 м',
+        eta: '~1 хв',
+        count: '1 од.',
+        pill: '<span style="color:#ef4444">🚨 ШВИДКІСНА РАКЕТА:</span> Кременчук / Потоки / Плавні',
+        yellowOblasts: [],
+        redOblasts: ['Полтавська', 'Дніпропетровська', 'Харківська', 'Запорізька']
+    },
+    'sp_clear': {
+        type: 'clear',
+        pill: '🟢 Повітряний простір чистий | Чергування ведеться 24/7',
+        yellowOblasts: [],
+        redOblasts: []
+    }
 };
 
 // Стан мапи
@@ -201,7 +290,7 @@ async function loadUkraineMap() {
         // Тактичний радар Кременчука
         initKremenchukAirDefenseRadar();
 
-        // Бойова обстановка 1-в-1 як на скріншоті
+        // Запуск бойової обстановки або пресету за посиланням
         initActiveCombatScene();
 
         console.log('✅ Карта України успішно завантажена!');
@@ -454,35 +543,55 @@ function clearAllVectors() {
     activeVectors.forEach((_, id) => removeThreatVector(id));
 }
 
+// Отримання параметра запуску з Telegram WebApp або URL (?startapp= або tg.initDataUnsafe.start_param)
+function getActiveParam() {
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.start_param) {
+        return window.Telegram.WebApp.initDataUnsafe.start_param;
+    }
+    const params = new URLSearchParams(window.location.search);
+    return params.get('startapp') || params.get('target') || '';
+}
+
 // ==========================================
-// 8. БОЙОВА ОБСТАНОВКА (1-В-1 ЯК НА СКРІНШОТІ ALERTS.IN.UA)
+// 8. БОЙОВА ОБСТАНОВКА (ДИНАМІЧНИЙ ВИБІР ПРЕСЕТУ)
 // ==========================================
 function initActiveCombatScene() {
-    const yellowRegions = ['Полтавська', 'Кіровоградська', 'Дніпропетровська', 'Сумська', 'Житомирська'];
-    yellowRegions.forEach(reg => setRegionThreat(reg, 'yellow'));
+    const param = getActiveParam();
+    const preset = TARGET_PRESETS[param] || TARGET_PRESETS['sh_south'];
 
-    const redRegions = ['Чернігівська', 'Харківська', 'Запорізька', 'Донецька', 'Луганська', 'АР Крим'];
-    redRegions.forEach(reg => setRegionThreat(reg, 'red'));
+    clearAllThreats();
 
-    const southLaunch = [48.35, 32.85];
-    const kremenchukCoords = [49.0700, 33.4200];
+    if (preset.type === 'clear') {
+        const pillText = document.getElementById('threat-live-text');
+        if (pillText) pillText.innerHTML = preset.pill;
+        updateHeaderStatus();
+        return;
+    }
+
+    if (preset.yellowOblasts) {
+        preset.yellowOblasts.forEach(reg => setRegionThreat(reg, 'yellow'));
+    }
+    if (preset.redOblasts) {
+        preset.redOblasts.forEach(reg => setRegionThreat(reg, 'red'));
+    }
+
     createThreatVector(
-        'vector_kremen_shahed',
-        southLaunch,
-        kremenchukCoords,
-        'shahed',
+        'vector_active_target',
+        preset.from,
+        preset.to,
+        preset.type,
         {
-            label: '🔻 БПЛА Shahed-136 (курс на місто)',
-            speed: '185 км/год',
-            altitude: '220 м',
-            eta: '~4 хв',
-            count: '2 од.'
+            label: preset.label,
+            speed: preset.speed,
+            altitude: preset.altitude,
+            eta: preset.eta,
+            count: preset.count
         }
     );
 
     const pillText = document.getElementById('threat-live-text');
     if (pillText) {
-        pillText.innerHTML = '<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Кременчук / Павлиш (2 борти) | ППО веде цілі';
+        pillText.innerHTML = preset.pill;
     }
 
     updateHeaderStatus();
@@ -497,25 +606,25 @@ window.AlertsManager = {
     clearAll: clearAllThreats,
     addVector: createThreatVector,
     removeVector: removeThreatVector,
+    applyPreset: (presetKey) => {
+        if (TARGET_PRESETS[presetKey]) {
+            const p = TARGET_PRESETS[presetKey];
+            clearAllThreats();
+            if (p.type !== 'clear') {
+                if (p.yellowOblasts) p.yellowOblasts.forEach(reg => setRegionThreat(reg, 'yellow'));
+                if (p.redOblasts) p.redOblasts.forEach(reg => setRegionThreat(reg, 'red'));
+                createThreatVector('vector_active_target', p.from, p.to, p.type, p);
+            }
+            const pillText = document.getElementById('threat-live-text');
+            if (pillText) pillText.innerHTML = p.pill;
+            updateHeaderStatus();
+        }
+    },
     getStatus: () => ({
         threatCount: activeThreats.size,
         threats: Object.fromEntries(activeThreats),
         vectors: Array.from(activeVectors.keys())
-    }),
-    applyBatchUpdate: (data) => {
-        if (!data) return;
-        if (data.clearFirst) clearAllThreats();
-        if (Array.isArray(data.threats)) {
-            data.threats.forEach(t => setRegionThreat(t.region, t.level));
-        }
-        if (Array.isArray(data.vectors)) {
-            data.vectors.forEach(v => createThreatVector(v.id, v.from, v.to, v.type, v.info));
-        }
-        if (data.statusText) {
-            const pillText = document.getElementById('threat-live-text');
-            if (pillText) pillText.innerHTML = data.statusText;
-        }
-    }
+    })
 };
 
 // ==========================================
