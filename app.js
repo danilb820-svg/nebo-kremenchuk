@@ -91,7 +91,10 @@ let geoJsonLayerGroup = null;
 
 async function loadDistrictsGeoJSON() {
     try {
-        const response = await fetch('geojson/districts.json');
+        let response = await fetch('districts.json');
+        if (!response.ok) {
+            response = await fetch('geojson/districts.json');
+        }
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }

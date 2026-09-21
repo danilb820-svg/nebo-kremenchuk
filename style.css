@@ -1,25 +1,20 @@
 /* style.css - Адаптивний дизайн та стилі Telegram Mini App */
 
 :root {
-    --bg-color: #0f141c;
-    --card-bg: rgba(23, 32, 42, 0.85);
-    --border-color: rgba(255, 255, 255, 0.12);
-    --text-primary: #ffffff;
+    --bg-color: #11141a;
+    --card-bg: rgba(18, 22, 31, 0.88);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #f1f5f9;
     --text-secondary: #94a3b8;
     
-    /* Кольори статусів загроз */
-    --color-default: #37474F;
-    --color-red: #E53935;
-    --color-yellow: #FDD835;
-    --color-green: #43A047;
+    /* Кольори статусів у стилі alerts.in.ua */
+    --color-default: #1e293b;
+    --color-red: #ff334b;     /* Червоний колір тривоги */
+    --color-yellow: #f59e0b;  /* Помаранчево-жовтий БПЛА */
+    --color-green: #10b981;
     
-    /* Telegram WebApp змінні за замовчуванням */
-    --tg-theme-bg-color: #0f141c;
-    --tg-theme-text-color: #ffffff;
-    --tg-theme-hint-color: #94a3b8;
-    --tg-theme-button-color: #2481cc;
-    --tg-theme-button-text-color: #ffffff;
-    --tg-theme-secondary-bg-color: #17212b;
+    --tg-theme-bg-color: #11141a;
+    --tg-theme-text-color: #f1f5f9;
 }
 
 * {
@@ -33,14 +28,14 @@
 html, body {
     width: 100%;
     height: 100%;
-    overflow: hidden; /* Без вертикального скролу */
-    background-color: var(--tg-theme-bg-color, var(--bg-color));
-    color: var(--tg-theme-text-color, var(--text-primary));
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
     position: relative;
 }
 
-/* Інтерактивна карта Leaflet */
+/* Карта */
 #map {
     position: absolute;
     top: 0;
@@ -50,7 +45,7 @@ html, body {
     width: 100%;
     height: 100%;
     z-index: 1;
-    background-color: #12161f;
+    background-color: #0b0f17;
 }
 
 /* Відключення дефолтних рамок фокусу leaflet */
@@ -427,99 +422,39 @@ html, body {
     gap: 6px;
 }
 
-/* Нижня плаваюча панель (Bottom Bar) */
-.bottom-bar-container {
+/* Нижня інформаційна плашка статусу (чисто, як у Мапі тривог) */
+.bottom-info-pill {
     position: absolute;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    left: 12px;
-    right: 12px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 1000;
-    background: var(--card-bg);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid var(--border-color);
-    border-radius: 18px;
-    padding: 10px 12px;
-    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.55);
-}
-
-.bottom-bar-title {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-secondary);
-    font-weight: 700;
-    margin-bottom: 8px;
-    text-align: center;
-}
-
-.bottom-bar {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-@media (min-width: 480px) {
-    .bottom-bar {
-        flex-direction: row;
-    }
-}
-
-.sim-btn {
-    flex: 1;
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    padding: 8px 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--tg-theme-text-color, #ffffff);
-    padding: 9px 10px;
-    border-radius: 10px;
+    gap: 8px;
     font-size: 12px;
     font-weight: 600;
-    cursor: pointer;
-    transition: all 0.18s ease;
-}
-
-.sim-btn:active {
-    transform: scale(0.97);
-}
-
-.sim-btn-danger {
-    background: rgba(229, 57, 53, 0.15);
-    border-color: rgba(229, 57, 53, 0.35);
-    color: #ff9997;
-}
-
-.sim-btn-danger:active {
-    background: rgba(229, 57, 53, 0.3);
-}
-
-.sim-btn-warning {
-    background: rgba(253, 216, 53, 0.15);
-    border-color: rgba(253, 216, 53, 0.35);
-    color: #ffe676;
-}
-
-.sim-btn-warning:active {
-    background: rgba(253, 216, 53, 0.3);
-}
-
-.sim-btn-neutral {
-    background: rgba(67, 160, 71, 0.15);
-    border-color: rgba(67, 160, 71, 0.35);
-    color: #a5d6a7;
-}
-
-.sim-btn-neutral:active {
-    background: rgba(67, 160, 71, 0.3);
-}
-
-.btn-icon {
-    font-size: 14px;
-}
-
-.btn-text {
+    color: #e2e8f0;
     white-space: nowrap;
+}
+
+.live-pulse {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+    animation: live-blinker 1.8s infinite;
+}
+
+@keyframes live-blinker {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
 }

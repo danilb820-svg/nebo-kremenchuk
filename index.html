@@ -54,24 +54,11 @@
         </div>
     </div>
 
-    <!-- Simulator Bottom Control Bar -->
-    <aside class="bottom-bar-container">
-        <div class="bottom-bar-title">Панель симуляції загроз (Кременчук)</div>
-        <div class="bottom-bar" id="bottom-bar">
-            <button id="btn-ballistika" class="sim-btn sim-btn-danger">
-                <span class="btn-icon">🚨</span>
-                <span class="btn-text">Балістика (Кременчук)</span>
-            </button>
-            <button id="btn-shahedy" class="sim-btn sim-btn-warning">
-                <span class="btn-icon">🛵</span>
-                <span class="btn-text">Шахеди через Кременчук</span>
-            </button>
-            <button id="btn-clear" class="sim-btn sim-btn-neutral">
-                <span class="btn-icon">🟢</span>
-                <span class="btn-text">Відбій тривог</span>
-            </button>
-        </div>
-    </aside>
+    <!-- Інформаційна плашка знизу у стилі Мапи тривог -->
+    <div class="bottom-info-pill">
+        <span class="live-pulse"></span>
+        <span id="threat-live-text">Система ППО: чергування ведеться 24/7</span>
+    </div>
 
     <!-- Leaflet.js -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
