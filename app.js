@@ -1,7 +1,8 @@
 /**
  * app.js - Інтерактивна тактична карта загроз та тривог "Небо Кременчука"
  * Точний візуальний стиль alerts.in.ua + тактичний радар ППО для Кременчука
- * Офіційне відображення тривог та відбоїв у реальному часі без фейкових статусів
+ * Офіційне відображення тривог та відбоїв у реальному часі
+ * АВТОМАТИЧНЕ ЖИВЕ ОНОВЛЕННЯ ТРИВОГ (SSE / POLLING) БЕЗ ПЕРЕЗАВАНТАЖЕННЯ СТОРІНКИ
  */
 
 // ==========================================
@@ -30,7 +31,11 @@ if (tg) {
 function triggerHapticFeedback(type = 'medium') {
     if (tg && tg.HapticFeedback) {
         try {
-            tg.HapticFeedback.impactOccurred(type);
+            if (type === 'warning' || type === 'heavy') {
+                tg.HapticFeedback.notificationOccurred('warning');
+            } else {
+                tg.HapticFeedback.impactOccurred(type);
+            }
         } catch (e) {}
     }
 }
@@ -96,359 +101,368 @@ const map = L.map('map', {
     attributionControl: false
 });
 
-// Базова темна підкладка (CartoDB Dark Matter)
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+// Додаємо підкладку CartoDB Dark
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 19
 }).addTo(map);
 
-// Стиль за замовчуванням
-function getDefaultStyle() {
-    return {
-        fillColor: THREAT_COLORS.DEFAULT,
-        fillOpacity: 0.94,
-        color: THREAT_COLORS.DEFAULT_BORDER,
-        weight: 1.5,
-        opacity: 0.95
-    };
-}
+// Кастомна кнопка геолокації Кременчука
+const CenterControl = L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd: function() {
+        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        const button = L.DomUtil.create('a', 'center-btn', container);
+        button.innerHTML = '🎯';
+        button.title = 'Центрувати на Кременчук';
+        button.href = '#';
+        button.style.fontSize = '18px';
+        button.style.lineHeight = '30px';
+        button.style.textAlign = 'center';
+        button.style.width = '32px';
+        button.style.height = '32px';
+        button.style.display = 'block';
+        button.style.background = '#151d2a';
+        button.style.color = '#fff';
+        button.style.border = '1px solid #2c3b54';
+        button.style.borderRadius = '6px';
+        button.style.cursor = 'pointer';
 
-// Нормалізація назви області
-function findCanonicalRegion(nameOrId) {
-    if (!nameOrId) return null;
-    const clean = String(nameOrId).trim().toLowerCase();
+        L.DomEvent.on(button, 'click', function(e) {
+            L.DomEvent.stop(e);
+            map.flyTo([49.0700, 33.4200], 10, { duration: 0.8 });
+            triggerHapticFeedback('light');
+        });
+        return container;
+    }
+});
+map.addControl(new CenterControl());
 
-    for (const [ukrName, info] of Object.entries(REGION_INFO)) {
-        if (ukrName.toLowerCase() === clean) return ukrName;
-        for (const alias of info.aliases) {
-            if (alias.toLowerCase() === clean) return ukrName;
-            if (clean.includes(alias.toLowerCase()) || alias.toLowerCase().includes(clean)) return ukrName;
+// ==========================================
+// 4. ЗАВАНТАЖЕННЯ GEOJSON ОБЛАСТЕЙ УКРАЇНИ
+// ==========================================
+function findCanonicalRegion(inputName) {
+    if (!inputName) return null;
+    const clean = inputName.toLowerCase().replace(/область|територіальна громада|громада|район|м./g, '').trim();
+    for (const [canonical, data] of Object.entries(REGION_INFO)) {
+        const canClean = canonical.toLowerCase().replace(/область|територіальна громада|громада|район|м./g, '').trim();
+        if (canClean.includes(clean) || clean.includes(canClean)) {
+            return canonical;
+        }
+        if (data.aliases.some(a => a.toLowerCase().includes(clean) || clean.includes(a.toLowerCase()))) {
+            return canonical;
         }
     }
     return null;
 }
 
-// ==========================================
-// 4. ЗАВАНТАЖЕННЯ ГЕОМЕТРІЇ КАРТИ УКРАЇНИ
-// ==========================================
+function getRegionStyle(threatLevel) {
+    if (threatLevel === 'red') {
+        return {
+            fillColor: THREAT_COLORS.RED,
+            fillOpacity: 0.78,
+            color: THREAT_COLORS.RED_BORDER,
+            weight: 1.8,
+            opacity: 0.95
+        };
+    } else if (threatLevel === 'yellow') {
+        return {
+            fillColor: THREAT_COLORS.YELLOW,
+            fillOpacity: 0.75,
+            color: THREAT_COLORS.YELLOW_BORDER,
+            weight: 1.8,
+            opacity: 0.95
+        };
+    } else {
+        return {
+            fillColor: THREAT_COLORS.DEFAULT,
+            fillOpacity: 0.65,
+            color: THREAT_COLORS.DEFAULT_BORDER,
+            weight: 1.1,
+            opacity: 0.8
+        };
+    }
+}
+
 async function loadUkraineMap() {
     try {
-        let response = await fetch('ukraine_map.json');
-        if (!response.ok) {
-            response = await fetch('geojson/districts.json');
-        }
-        if (!response.ok) {
-            throw new Error('HTTP error ' + response.status);
-        }
-        const geojsonData = await response.json();
+        let geoData = null;
+        try {
+            const resp = await fetch('ukraine_map.json');
+            if (resp.ok) geoData = await resp.json();
+        } catch (e) {}
 
-        const geojsonLayer = L.geoJSON(geojsonData, {
-            style: getDefaultStyle,
+        if (!geoData) {
+            const resp2 = await fetch('geojson/ukraine_oblasts.geojson');
+            if (resp2.ok) geoData = await resp2.json();
+        }
+
+        if (!geoData) {
+            console.error('Не знайдено файл геометрії областей');
+            return;
+        }
+
+        const geoLayer = L.geoJSON(geoData, {
+            style: (feature) => {
+                const rawName = feature.properties?.name || feature.properties?.NAME_1 || feature.properties?.shapeName || '';
+                const canonical = findCanonicalRegion(rawName) || rawName;
+                const threat = activeThreats.get(canonical);
+                return getRegionStyle(threat);
+            },
             onEachFeature: (feature, layer) => {
-                const props = feature.properties || {};
-                const rawName = props.name_ukr || props.name || props.rawName || props.id;
-                const canonicalName = findCanonicalRegion(rawName) || rawName;
+                const rawName = feature.properties?.name || feature.properties?.NAME_1 || feature.properties?.shapeName || '';
+                const canonical = findCanonicalRegion(rawName) || rawName;
 
-                regionLayers.set(canonicalName, layer);
-                if (props.id) regionLayers.set(props.id, layer);
-                if (props.name) regionLayers.set(props.name, layer);
+                if (canonical) {
+                    regionLayers.set(canonical, layer);
+                }
 
                 layer.on({
-                    click: () => {
-                        triggerHapticFeedback('light');
-                        const threat = activeThreats.get(canonicalName);
-                        let statusText = '🟢 Немає тривоги (Відбій)';
-                        if (threat) {
-                            statusText = threat.threatLevel === 'red'
-                                ? '🚨 <b>Повітряна тривога</b>'
-                                : '⚠️ <b>Загроза БПЛА (Шахеди)</b>';
+                    mouseover: (e) => {
+                        const curThreat = activeThreats.get(canonical);
+                        if (!curThreat) {
+                            e.target.setStyle({ fillOpacity: 0.85, weight: 1.6, color: '#4a6288' });
                         }
-                        layer.bindPopup(
-                            '<div style="font-family:Inter,sans-serif;font-size:13px;line-height:1.4;">' +
-                            '<b>' + canonicalName + '</b><br>' +
-                            '<span>' + statusText + '</span>' +
-                            '</div>'
-                        ).openPopup();
+                    },
+                    mouseout: (e) => {
+                        const curThreat = activeThreats.get(canonical);
+                        e.target.setStyle(getRegionStyle(curThreat));
+                    },
+                    click: (e) => {
+                        triggerHapticFeedback('light');
+                        showRegionPopup(canonical, e.latlng);
                     }
                 });
             }
         }).addTo(map);
 
-        // Додаємо підписи областей прямо на карті (alerts.in.ua style)
-        for (const [ukrName, info] of Object.entries(REGION_INFO)) {
-            if (info.center) {
-                L.marker(info.center, {
-                    icon: L.divIcon({
-                        className: 'region-label',
-                        html: '<div class="region-label-text" id="lbl-' + encodeURIComponent(ukrName) + '">' + ukrName + '</div>',
-                        iconSize: [110, 20],
-                        iconAnchor: [55, 10]
-                    }),
-                    interactive: false
-                }).addTo(map);
+        addRegionLabels();
+        addKremenchukMarker();
 
-                const el = document.getElementById('lbl-' + encodeURIComponent(ukrName));
-                if (el) labelElements.set(ukrName, el);
-            }
-        }
-
-        // Адаптуємо межі під екран
-        try {
-            const bounds = geojsonLayer.getBounds();
-            if (bounds.isValid()) {
-                map.fitBounds(bounds, { padding: [15, 15], maxZoom: 6.8 });
-            }
-        } catch (e) {}
-
-        // Тактичний радар Кременчука
-        initKremenchukAirDefenseRadar();
-
-        // Завантаження офіційних тривог та відбоїв
+        // Початкова ініціалізація сцени з параметрів посилання
         initActiveCombatScene();
 
-        console.log('✅ Карта України успішно завантажена!');
+        // Запуск автоматичного живого оновлення
+        initLiveAutoUpdates();
 
     } catch (err) {
-        console.error('❌ Помилка завантаження карти України:', err);
-        const pillText = document.getElementById('threat-live-text');
-        if (pillText) {
-            pillText.innerHTML = '<span style="color:#ef4444">Помилка завантаження карти. Спробуйте оновити.</span>';
+        console.error('Помилка завантаження геоданих:', err);
+    }
+}
+
+// ==========================================
+// 5. ПІДПИСИ ОБЛАСТЕЙ ТА МАРКЕР КРЕМЕНЧУКА
+// ==========================================
+function addRegionLabels() {
+    for (const [name, info] of Object.entries(REGION_INFO)) {
+        if (!info.center) continue;
+
+        const icon = L.divIcon({
+            className: 'region-name-label',
+            html: `<span class="label-text" id="label-${encodeURIComponent(name)}">${name}</span>`,
+            iconSize: [120, 20],
+            iconAnchor: [60, 10]
+        });
+
+        const marker = L.marker(info.center, { icon, interactive: false }).addTo(map);
+        labelElements.set(name, marker);
+    }
+}
+
+function addKremenchukMarker() {
+    const kremIcon = L.divIcon({
+        className: 'kremenchuk-base-pin',
+        html: `
+            <div class="krem-pulse-ring"></div>
+            <div class="krem-center-core"></div>
+            <div class="krem-caption">м. Кременчук</div>
+        `,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+    });
+
+    const marker = L.marker([49.0700, 33.4200], { icon: kremIcon, zIndexOffset: 1000 }).addTo(map);
+    marker.on('click', () => {
+        triggerHapticFeedback('medium');
+        map.flyTo([49.0700, 33.4200], 11, { duration: 0.6 });
+        showKremenchukDetails();
+    });
+}
+
+function showKremenchukDetails() {
+    const hasActiveThreat = activeThreats.get('Полтавська') || activeVectors.size > 0;
+    const content = `
+        <div class="popup-box">
+            <div class="popup-title">🛡️ Кременчук — Сектор ППО</div>
+            <div class="popup-body">
+                ${hasActiveThreat 
+                    ? '<span style="color:#ef4444;font-weight:700;">🚨 УВАГА: ЗАГРОЗА ДЛЯ РАЙОНУ!</span><br>Працюють сили ППО та мобільні вогневі групи.' 
+                    : '<span style="color:#22c55e;font-weight:700;">🟢 ОБСТАНОВКА СПОКІЙНА</span><br>Прямої загрози для міста наразі не виявлено.'}
+                <hr style="border:none;border-top:1px solid #2c3b54;margin:8px 0;">
+                <div style="font-size:11px;color:#94a3b8;">Рубежі оборони: Павлиш • Світловодськ • Градизьк • Горішні Плавні</div>
+            </div>
+        </div>
+    `;
+    L.popup({ offset: [0, -10], className: 'dark-leaflet-popup' })
+        .setLatLng([49.0700, 33.4200])
+        .setContent(content)
+        .openOn(map);
+}
+
+function showRegionPopup(regionName, latlng) {
+    const threat = activeThreats.get(regionName);
+    const content = `
+        <div class="popup-box">
+            <div class="popup-title">${regionName} область</div>
+            <div class="popup-status ${threat || 'calm'}">
+                ${threat === 'red' ? '🚨 ПОВІТРЯНА ТРИВОГА' : (threat === 'yellow' ? '⚠️ ПІДВИЩЕНА НЕБЕЗПЕКА (БПЛА)' : '🟢 СПОКІЙНО')}
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-top:4px;">
+                Офіційний реєстр повітряних тривог України
+            </div>
+        </div>
+    `;
+    L.popup({ offset: [0, -5], className: 'dark-leaflet-popup' })
+        .setLatLng(latlng)
+        .setContent(content)
+        .openOn(map);
+}
+
+// ==========================================
+// 6. КЕРУВАННЯ СТАНОМ ТРИВОГ
+// ==========================================
+function setRegionThreat(regionName, level = 'red') {
+    const canonical = findCanonicalRegion(regionName) || regionName;
+    activeThreats.set(canonical, level);
+
+    const layer = regionLayers.get(canonical);
+    if (layer) {
+        layer.setStyle(getRegionStyle(level));
+    }
+
+    const labelMarker = labelElements.get(canonical);
+    if (labelMarker) {
+        const el = document.getElementById('label-' + encodeURIComponent(canonical));
+        if (el) {
+            el.className = 'label-text ' + (level ? 'threat-' + level : '');
         }
     }
 }
 
-// ==========================================
-// 5. ТАКТИЧНИЙ РАДАР ППО КРЕМЕНЧУКА
-// ==========================================
-function initKremenchukAirDefenseRadar() {
-    const kremenchukCoords = [49.0700, 33.4200];
+function clearRegionThreat(regionName) {
+    const canonical = findCanonicalRegion(regionName) || regionName;
+    activeThreats.delete(canonical);
 
-    // Зона ближньої оборони (20 км - мобільні вогневі групи ППО)
-    L.circle(kremenchukCoords, {
-        radius: 20000,
-        color: '#22c55e',
-        weight: 1.2,
-        dashArray: '4, 6',
-        fillOpacity: 0.04,
-        fillColor: '#22c55e',
-        interactive: false
-    }).addTo(map);
-
-    // Зона перехоплення (50 км - сектор ЗРК середньої дальності)
-    L.circle(kremenchukCoords, {
-        radius: 50000,
-        color: '#3b82f6',
-        weight: 1.0,
-        dashArray: '6, 8',
-        fillOpacity: 0.02,
-        fillColor: '#3b82f6',
-        interactive: false
-    }).addTo(map);
-
-    // Дальній рубіж радіолокаційного виявлення (100 км)
-    L.circle(kremenchukCoords, {
-        radius: 100000,
-        color: '#64748b',
-        weight: 0.8,
-        dashArray: '8, 12',
-        fillOpacity: 0.01,
-        fillColor: '#64748b',
-        interactive: false
-    }).addTo(map);
-
-    // Тактичні мітки рубежів
-    const addRadarLabel = (lat, lng, text, color) => {
-        L.marker([lat, lng], {
-            icon: L.divIcon({
-                className: 'radar-ring-label',
-                html: '<span style="color:' + color + ';font-size:9px;font-family:monospace;letter-spacing:0.8px;background:rgba(15,20,28,0.85);padding:2px 6px;border-radius:4px;border:1px solid ' + color + '44;white-space:nowrap;">' + text + '</span>',
-                iconSize: [110, 16],
-                iconAnchor: [55, 8]
-            }),
-            interactive: false
-        }).addTo(map);
-    };
-
-    addRadarLabel(49.25, 33.42, 'ЗОНА ППО 20КМ', '#22c55e');
-    addRadarLabel(49.52, 33.42, 'СЕКТОР ЗРК 50КМ', '#3b82f6');
-    addRadarLabel(49.97, 33.42, 'РУБІЖ 100КМ', '#64748b');
-
-    // Опорний тактичний маркер міста Кременчук
-    L.marker(kremenchukCoords, {
-        icon: L.divIcon({
-            className: 'kremenchuk-base-marker',
-            html: 
-                '<div style="position:relative;display:flex;align-items:center;justify-content:center;">' +
-                    '<div style="position:absolute;width:16px;height:16px;border-radius:50%;background:#38bdf8;box-shadow:0 0 12px #38bdf8;animation:radar-ping 2s infinite;"></div>' +
-                    '<div style="position:absolute;width:8px;height:8px;border-radius:50%;background:#ffffff;"></div>' +
-                    '<span style="position:absolute;left:14px;top:-7px;font-size:11px;font-weight:700;color:#ffffff;text-shadow:0 1px 4px #000,0 0 2px #000;white-space:nowrap;font-family:Inter,sans-serif;">м. Кременчук</span>' +
-                '</div>',
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
-        }),
-        interactive: false
-    }).addTo(map);
-}
-
-// ==========================================
-// 6. УПРАВЛІННЯ СТАТУСАМИ ТРИВОГ В ОБЛАСТЯХ
-// ==========================================
-function setRegionThreat(regionNameOrId, threatLevel) {
-    const canonicalName = findCanonicalRegion(regionNameOrId) || regionNameOrId;
-    const layer = regionLayers.get(canonicalName) || regionLayers.get(regionNameOrId);
-    if (!layer) return;
-
-    if (threatLevel === 'red') {
-        layer.setStyle({
-            fillColor: THREAT_COLORS.RED,
-            fillOpacity: 0.95,
-            color: THREAT_COLORS.RED_BORDER,
-            weight: 1.8,
-            opacity: 1
-        });
-        activeThreats.set(canonicalName, { threatLevel: 'red' });
-    } else if (threatLevel === 'yellow') {
-        layer.setStyle({
-            fillColor: THREAT_COLORS.YELLOW,
-            fillOpacity: 0.95,
-            color: THREAT_COLORS.YELLOW_BORDER,
-            weight: 1.8,
-            opacity: 1
-        });
-        activeThreats.set(canonicalName, { threatLevel: 'yellow' });
-    } else {
-        layer.setStyle(getDefaultStyle());
-        activeThreats.delete(canonicalName);
+    const layer = regionLayers.get(canonical);
+    if (layer) {
+        layer.setStyle(getRegionStyle(null));
     }
 
-    const labelEl = labelElements.get(canonicalName);
-    if (labelEl) {
-        if (threatLevel === 'red' || threatLevel === 'yellow') {
-            labelEl.classList.add('in-alarm');
-        } else {
-            labelEl.classList.remove('in-alarm');
-        }
+    const labelMarker = labelElements.get(canonical);
+    if (labelMarker) {
+        const el = document.getElementById('label-' + encodeURIComponent(canonical));
+        if (el) el.className = 'label-text';
     }
-
-    updateHeaderStatus();
-}
-
-function clearRegionThreat(regionNameOrId) {
-    setRegionThreat(regionNameOrId, 'default');
 }
 
 function clearAllThreats() {
-    for (const canonicalName of Object.keys(REGION_INFO)) {
-        const layer = regionLayers.get(canonicalName);
-        if (layer) layer.setStyle(getDefaultStyle());
-        const labelEl = labelElements.get(canonicalName);
-        if (labelEl) labelEl.classList.remove('in-alarm');
-    }
+    activeThreats.forEach((_, name) => clearRegionThreat(name));
     activeThreats.clear();
     clearAllVectors();
     updateHeaderStatus();
 }
 
 function updateHeaderStatus() {
-    const badge = document.getElementById('active-alarms-badge');
-    const summary = document.getElementById('threat-summary');
-    const count = activeThreats.size;
+    const activeBadge = document.getElementById('active-alarms-badge');
+    const subtitle = document.getElementById('threat-summary');
 
-    if (badge) {
-        badge.textContent = count + ' активних';
-        if (count > 0) {
-            badge.classList.add('active-threat');
+    let redCount = 0;
+    activeThreats.forEach(lvl => { if (lvl === 'red') redCount++; });
+
+    if (activeBadge) {
+        if (redCount > 0) {
+            activeBadge.innerText = redCount + ' тривог';
+            activeBadge.className = 'header-badge active-alert';
         } else {
-            badge.classList.remove('active-threat');
+            activeBadge.innerText = '0 тривог';
+            activeBadge.className = 'header-badge';
         }
     }
 
-    if (summary) {
-        const hasKremenThreat = activeThreats.has('Полтавська') || activeThreats.has('Кіровоградська');
-        if (hasKremenThreat) {
-            summary.innerHTML = '<span style="color:#ef4444">🚨 ТРИВОГА: Кременчуцький район!</span>';
-        } else if (count > 0) {
-            summary.textContent = 'Кременчук спокійно. Тривоги в ' + count + ' областях';
+    if (subtitle) {
+        const poltavaThreat = activeThreats.get('Полтавська');
+        if (poltavaThreat === 'red' || activeVectors.size > 0) {
+            subtitle.innerText = '🚨 ТРИВОГА ПО РАЙОНУ!';
+            subtitle.style.color = '#ef4444';
+        } else if (poltavaThreat === 'yellow') {
+            subtitle.innerText = '⚠️ Загроза БПЛА поблизу!';
+            subtitle.style.color = '#f59e0b';
         } else {
-            summary.textContent = 'Кременчук та район у нормі';
+            subtitle.innerText = 'Кременчук та район у нормі';
+            subtitle.style.color = '#94a3b8';
         }
     }
 }
 
 // ==========================================
-// 7. ВЕКТОРНІ ТРАЄКТОРІЇ
+// 7. ТАКТИЧНІ ВЕКТОРИ ЦІЛЕЙ (ШАХЕДИ / БАЛІСТИКА)
 // ==========================================
-function calculateBearing(startLat, startLng, destLat, destLng) {
-    const toRad = (deg) => (deg * Math.PI) / 180;
-    const toDeg = (rad) => (rad * 180) / Math.PI;
-
-    const y = Math.sin(toRad(destLng - startLng)) * Math.cos(toRad(destLat));
-    const x = Math.cos(toRad(startLat)) * Math.sin(toRad(destLat)) -
-              Math.sin(toRad(startLat)) * Math.cos(toRad(destLat)) * Math.cos(toRad(destLng - startLng));
-    let brng = toDeg(Math.atan2(y, x));
-    return (brng + 360) % 360;
-}
-
-function createThreatVector(targetId, fromCoords, toCoords, type, info) {
-    removeThreatVector(targetId);
+function createThreatVector(id, fromLatLng, toLatLng, type = 'shahed', options = {}) {
+    removeThreatVector(id);
 
     const isBallistic = type === 'ballistic';
-    const color = isBallistic ? THREAT_COLORS.RED_BORDER : THREAT_COLORS.YELLOW_BORDER;
-    const iconSymbol = isBallistic ? '🚀' : '🔻';
-    const cssClass = isBallistic ? 'target-ballistic' : 'target-shahed';
+    const lineColor = isBallistic ? '#ef4444' : '#f59e0b';
 
-    const polyline = L.polyline([fromCoords, toCoords], {
-        color: color,
+    const pathLine = L.polyline([fromLatLng, toLatLng], {
+        color: lineColor,
         weight: 3.5,
-        opacity: 0.85,
-        dashArray: '8, 8',
-        className: 'animated-vector-line'
+        opacity: 0.95,
+        dashArray: isBallistic ? '4, 8' : '8, 8',
+        className: isBallistic ? 'ballistic-anim-line' : 'shahed-anim-line'
     }).addTo(map);
 
-    const bearing = calculateBearing(fromCoords[0], fromCoords[1], toCoords[0], toCoords[1]);
+    const iconHtml = isBallistic 
+        ? '<div class="missile-marker">🚀</div>'
+        : '<div class="shahed-marker">🔻</div>';
 
-    const curLat = fromCoords[0] + (toCoords[0] - fromCoords[0]) * 0.65;
-    const curLng = fromCoords[1] + (toCoords[1] - fromCoords[1]) * 0.65;
+    const targetMarker = L.marker(fromLatLng, {
+        icon: L.divIcon({
+            className: 'live-target-icon',
+            html: iconHtml,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        }),
+        zIndexOffset: 999
+    }).addTo(map);
 
-    const targetDivIcon = L.divIcon({
-        className: 'military-target-divicon',
-        html: 
-            '<div class="military-target-container ' + cssClass + '">' +
-                '<div class="target-radar-ping"></div>' +
-                '<div class="target-head" style="transform: rotate(' + bearing + 'deg)">' +
-                    '<span class="target-icon">' + iconSymbol + '</span>' +
-                    '<span class="target-arrow">➤</span>' +
-                '</div>' +
-                '<div class="target-tag">' +
-                    '<div class="target-tag-title">' + info.label + '</div>' +
-                    '<div class="target-tag-meta">' +
-                        '<span>Кількість: <b>' + (info.count || '1') + '</b></span> | ' +
-                        '<span>Швидкість: <b>' + info.speed + '</b></span>' +
-                    '</div>' +
-                    '<div class="target-tag-meta">' +
-                        '<span>Курс: <b>' + Math.round(bearing) + '°</b></span> | ' +
-                        '<span style="color: ' + color + '"><b>ETA: ' + info.eta + '</b></span>' +
-                    '</div>' +
-                '</div>' +
-            '</div>',
-        iconSize: [220, 60],
-        iconAnchor: [16, 16]
+    targetMarker.on('click', () => {
+        triggerHapticFeedback('medium');
+        const popupText = `
+            <div class="popup-box">
+                <div class="popup-title">${options.label || (isBallistic ? 'Швидкісна ракета' : 'БПЛА Shahed-136')}</div>
+                <div class="popup-body">
+                    <b>Напрямок:</b> ${options.sector || 'курс на Кременчук'}<br>
+                    <b>Швидкість:</b> ${options.speed || (isBallistic ? '~2800 км/год' : '~185 км/год')}<br>
+                    <b>Висота:</b> ${options.altitude || (isBallistic ? '12 000 м' : '250 м')}<br>
+                    <b>Розрахунковий час:</b> ${options.eta || '~3-5 хв'}
+                </div>
+            </div>
+        `;
+        L.popup({ offset: [0, -10], className: 'dark-leaflet-popup' })
+            .setLatLng(fromLatLng)
+            .setContent(popupText)
+            .openOn(map);
     });
 
-    const targetMarker = L.marker([curLat, curLng], {
-        icon: targetDivIcon,
-        zIndexOffset: 1200
-    }).addTo(map);
-
-    activeVectors.set(targetId, { polyline, targetMarker });
+    activeVectors.set(id, { line: pathLine, marker: targetMarker });
 }
 
-function removeThreatVector(vectorId) {
-    if (activeVectors.has(vectorId)) {
-        const item = activeVectors.get(vectorId);
-        if (item.polyline) map.removeLayer(item.polyline);
-        if (item.targetMarker) map.removeLayer(item.targetMarker);
-        activeVectors.delete(vectorId);
+function removeThreatVector(id) {
+    const existing = activeVectors.get(id);
+    if (existing) {
+        if (existing.line) map.removeLayer(existing.line);
+        if (existing.marker) map.removeLayer(existing.marker);
+        activeVectors.delete(id);
     }
 }
 
@@ -494,7 +508,6 @@ function initActiveCombatScene() {
     // 1. Якщо передано список реальних тривог від офіційного джерела
     if (alertsData) {
         if (alertsData.clearAll || alertsData.activeRegions.length === 0) {
-            // Офіційний повний відбій
             const pillText = document.getElementById('threat-live-text');
             if (pillText) pillText.innerHTML = '🟢 <b>Офіційний відбій!</b> Кременчук та район — небезпека минула';
             updateHeaderStatus();
@@ -553,7 +566,7 @@ function initActiveCombatScene() {
         return;
     }
 
-    // 3. За замовчуванням: чиста спокійна обстановка без фейкових тривог
+    // 3. За замовчуванням
     const pillText = document.getElementById('threat-live-text');
     if (pillText) {
         pillText.innerHTML = '🟢 <b>Кременчук та район:</b> спокійно | ППО чергує 24/7';
@@ -562,7 +575,116 @@ function initActiveCombatScene() {
 }
 
 // ==========================================
-// 9. API МЕНЕДЖЕРА КАРТИ
+// 9. АВТОМАТИЧНА СИНХРОНІЗАЦІЯ В РЕАЛЬНОМУ ЧАСІ (LIVE SSE / POLLING)
+// ==========================================
+const LIVE_CHANNEL = 'nebo_kremenchuk_alerts_live';
+let sseConnection = null;
+let pollTimer = null;
+
+function applyLiveAlertsUpdate(payload) {
+    if (!payload) return;
+
+    // 1. Оновлюємо області
+    clearAllThreats();
+
+    const activeList = Array.isArray(payload.activeRegions) ? payload.activeRegions : [];
+    let poltavaHasThreat = Boolean(payload.poltavaActive);
+
+    activeList.forEach(regName => {
+        const canonical = findCanonicalRegion(regName) || regName;
+        setRegionThreat(canonical, 'red');
+        if (canonical === 'Полтавська') poltavaHasThreat = true;
+    });
+
+    // 2. Динамічний вектор цілі (якщо наявний)
+    if (payload.vector && payload.vector.from && payload.vector.to) {
+        createThreatVector(
+            'vector_live_target',
+            payload.vector.from,
+            payload.vector.to,
+            payload.vector.type || 'shahed',
+            payload.vector.meta || {}
+        );
+        setRegionThreat('Полтавська', payload.vector.type === 'ballistic' ? 'red' : 'yellow');
+    } else {
+        removeThreatVector('vector_live_target');
+    }
+
+    // 3. Оновлення тексту нижньої плашки та тактильного відгуку
+    const pillText = document.getElementById('threat-live-text');
+    if (pillText) {
+        if (payload.vector) {
+            pillText.innerHTML = payload.vector.type === 'ballistic'
+                ? '<span style="color:#ef4444">🚨 БАЛІСТИКА:</span> курс на Кременчук! Всі в укриття!'
+                : `<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Кременчук / ${payload.vector.sector || 'Павлиш'}`;
+            triggerHapticFeedback('heavy');
+        } else if (poltavaHasThreat) {
+            pillText.innerHTML = '<span style="color:#ef4444">🚨 ПОВІТРЯНА ТРИВОГА:</span> Полтавська область / Кременчук!';
+            triggerHapticFeedback('warning');
+        } else if (activeList.length === 0) {
+            pillText.innerHTML = '🟢 <b>Офіційний відбій!</b> По всій Україні спокійно';
+        } else {
+            pillText.innerHTML = '🟢 <b>Кременчук: спокійно.</b> Офіційні тривоги: ' + activeList.slice(0, 3).join(', ');
+        }
+    }
+
+    updateHeaderStatus();
+}
+
+function initLiveAutoUpdates() {
+    // 1. Початкове негайне опитування останнього стану
+    fetchLiveAlertsOnce();
+
+    // 2. Підключення до Server-Sent Events (миттєве оновлення без перезавантаження)
+    try {
+        if (window.EventSource) {
+            sseConnection = new EventSource(`https://ntfy.sh/${LIVE_CHANNEL}/sse`);
+
+            sseConnection.onmessage = (event) => {
+                try {
+                    const eventData = JSON.parse(event.data);
+                    if (eventData.event === 'message' && eventData.message) {
+                        const payload = JSON.parse(eventData.message);
+                        applyLiveAlertsUpdate(payload);
+                    }
+                } catch (e) {
+                    console.warn('SSE parse note:', e);
+                }
+            };
+
+            sseConnection.onerror = () => {
+                if (!pollTimer) {
+                    pollTimer = setInterval(fetchLiveAlertsOnce, 8000);
+                }
+            };
+        } else {
+            pollTimer = setInterval(fetchLiveAlertsOnce, 8000);
+        }
+    } catch (e) {
+        pollTimer = setInterval(fetchLiveAlertsOnce, 8000);
+    }
+}
+
+function fetchLiveAlertsOnce() {
+    fetch(`https://ntfy.sh/${LIVE_CHANNEL}/json?poll=1&since=30m`)
+        .then(res => res.text())
+        .then(text => {
+            const lines = text.trim().split('\n').filter(Boolean);
+            if (lines.length === 0) return;
+            const lastLine = lines[lines.length - 1];
+            const data = JSON.parse(lastLine);
+            if (data && data.message) {
+                const payload = JSON.parse(data.message);
+                applyLiveAlertsUpdate(payload);
+            }
+        })
+        .catch(err => {
+            console.warn('Live alerts poll note:', err.message);
+        });
+}
+
+// ==========================================
+// 10. API МЕНЕДЖЕРА КАРТИ
 // ==========================================
 window.AlertsManager = {
     setThreat: setRegionThreat,
@@ -570,13 +692,7 @@ window.AlertsManager = {
     clearAll: clearAllThreats,
     addVector: createThreatVector,
     removeVector: removeThreatVector,
-    updateFromOfficial: (regionsList) => {
-        clearAllThreats();
-        if (Array.isArray(regionsList)) {
-            regionsList.forEach(r => setRegionThreat(r, 'red'));
-        }
-        updateHeaderStatus();
-    },
+    applyLiveAlerts: applyLiveAlertsUpdate,
     getStatus: () => ({
         threatCount: activeThreats.size,
         threats: Object.fromEntries(activeThreats),
@@ -585,7 +701,7 @@ window.AlertsManager = {
 };
 
 // ==========================================
-// 10. СТАРТ
+// 11. СТАРТ
 // ==========================================
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', loadUkraineMap);
