@@ -1,20 +1,20 @@
 /* style.css - Адаптивний дизайн та стилі Telegram Mini App */
 
 :root {
-    --bg-color: #11141a;
-    --card-bg: rgba(18, 22, 31, 0.88);
+    --bg-color: #12151c; /* Точний темно-графітовий фон alerts.in.ua */
+    --card-bg: rgba(18, 21, 28, 0.9);
     --border-color: rgba(255, 255, 255, 0.08);
-    --text-primary: #f1f5f9;
+    --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
     
-    /* Кольори статусів у стилі alerts.in.ua */
-    --color-default: #1e293b;
-    --color-red: #ff334b;     /* Червоний колір тривоги */
-    --color-yellow: #f59e0b;  /* Помаранчево-жовтий БПЛА */
+    /* Точні кольори з вашого скріншоту Мапи тривог: */
+    --color-default: #1c2638;       /* Темно-синій/сірий коли немає тривоги */
+    --color-default-border: #2c3b54;/* Контурні межі областей */
+    --color-red: #581c24;           /* Темно-бордовий/червоний колір тривоги з alerts.in.ua */
+    --color-red-border: #ef4444;
+    --color-yellow: #cda34f;        /* Пісочно-жовтий/помаранчевий рівень тривоги з alerts.in.ua */
+    --color-yellow-border: #f59e0b;
     --color-green: #10b981;
-    
-    --tg-theme-bg-color: #11141a;
-    --tg-theme-text-color: #f1f5f9;
 }
 
 * {
@@ -45,7 +45,7 @@ html, body {
     width: 100%;
     height: 100%;
     z-index: 1;
-    background-color: #0b0f17;
+    background-color: #12151c;
 }
 
 /* Відключення дефолтних рамок фокусу leaflet */
@@ -208,8 +208,26 @@ html, body {
     box-shadow: 0 0 8px var(--color-yellow);
 }
 
-.legend-bullet.grey {
-    background-color: #607d8b;
+/* Підписи назв областей прямо на карті, як на alerts.in.ua */
+.region-label {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    pointer-events: none;
+}
+
+.region-label-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: #cbd5e1;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9), 0 0 2px #000;
+    white-space: nowrap;
+    transform: translate(-50%, -50%);
+}
+
+.region-label-text.in-alarm {
+    color: #ffffff;
+    font-weight: 700;
 }
 
 /* Кастомний маркер таймера району (DivIcon) */

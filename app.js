@@ -35,99 +35,136 @@ function triggerHapticFeedback(type = 'medium') {
 }
 
 // ==========================================
-// 2. СТАН ДОДАТКУ ТА КОНФІГУРАЦІЯ
+// 2. СТАН ДОДАТКУ ТА КОНФІГУРАЦІЯ (СТИЛЬ ALERTS.IN.UA)
 // ==========================================
 const THREAT_COLORS = {
-    DEFAULT: '#37474F',
-    RED: '#E53935',     // Пряма загроза балістики / ракет
-    YELLOW: '#FDD835'   // Загроза БПЛА (Шахеди) / тактичної авіації
+    DEFAULT: '#1c2638',        // Спокійні області (темно-синій)
+    DEFAULT_BORDER: '#283548',
+    RED: '#5c1922',            // Червоний рівень (бордовий з alerts.in.ua)
+    RED_BORDER: '#b91c1c',
+    YELLOW: '#c99e46',         // Жовтий рівень (пісочний з alerts.in.ua)
+    YELLOW_BORDER: '#d97706'
 };
 
-// Стан активних загроз по районах ( district_id -> { threatLevel: 'red'|'yellow', alarmStartTime: timestamp, timerMarker: L.marker } )
+// Стан активних загроз по областях/районах
 const activeThreats = new Map();
-
-// Активні вектори загроз (траєкторії): id -> { polyline: L.polyline, tooltipMarker: L.marker }
 const activeVectors = new Map();
+const regionLayers = new Map();
 
-// Шар полігонів районів Leaflet: id -> L.Polygon
-const districtLayers = new Map();
+// Центри областей для відображення назв та таймерів
+const REGION_CENTERS = {
+    'Полтавська': [49.58, 34.55],
+    'Кіровоградська': [48.51, 32.26],
+    'Дніпропетровська': [48.46, 35.04],
+    'Харківська': [49.99, 36.23],
+    'Сумська': [50.90, 34.79],
+    'Чернігівська': [51.49, 31.28],
+    'Київська': [50.45, 30.52],
+    'Черкаська': [49.44, 32.05],
+    'Запорізька': [47.83, 35.13],
+    'Донецька': [48.01, 37.80],
+    'Луганська': [48.57, 39.30],
+    'Миколаївська': [46.97, 31.99],
+    'Херсонська': [46.63, 32.61],
+    'Одеська': [46.48, 30.72],
+    'Житомирська': [50.25, 28.65],
+    'Вінницька': [49.23, 28.46],
+    'Хмельницька': [49.42, 26.98],
+    'Рівненська': [50.61, 26.25],
+    'Волинська': [50.74, 25.32],
+    'Львівська': [49.83, 24.02],
+    'Тернопільська': [49.55, 25.59],
+    'Івано-Франківська': [48.92, 24.71],
+    'Закарпатська': [48.62, 22.28],
+    'Чернівецька': [48.29, 25.93],
+    'Автономна Республіка Крим': [45.34, 34.49]
+};
 
 // ==========================================
-// 3. НАЛАШТУВАННЯ КАРТИ LEAFLET.JS
+// 3. НАЛАШТУВАННЯ КАРТИ LEAFLET.JS (МАСШТАБ ТА ПОЗИЦІЯ)
 // ==========================================
-// Центр карти фокусується на Кременчуці та прилеглих районах Полтавщини і Кіровоградщини
 const map = L.map('map', {
-    center: [49.0700, 33.4200],
-    zoom: 8.2,
-    minZoom: 6,
-    maxZoom: 14,
+    center: [48.7, 32.8],
+    zoom: 6.8,
+    minZoom: 5.5,
+    maxZoom: 12,
     zoomControl: false,
-    attributionControl: true
+    attributionControl: false
 });
 
-// Темний тайловий шар CartoDB Dark Matter
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 19
-}).addTo(map);
-
-// Стиль району за замовчуванням
+// Стиль області за замовчуванням (alerts.in.ua)
 function getDefaultStyle() {
     return {
         fillColor: THREAT_COLORS.DEFAULT,
-        fillOpacity: 0.35,
-        color: '#546E7A',
-        weight: 1.5,
-        opacity: 0.7,
-        className: 'district-polygon-default'
+        fillOpacity: 0.95,
+        color: THREAT_COLORS.DEFAULT_BORDER,
+        weight: 1.2,
+        opacity: 0.85
     };
 }
 
 // ==========================================
-// 4. ЗАВАНТАЖЕННЯ МЕЖ РАЙОНІВ (GEOJSON)
+// 4. ЗАВАНТАЖЕННЯ МЕЖ ОБЛАСТЕЙ УКРАЇНИ
 // ==========================================
-let geoJsonLayerGroup = null;
-
 async function loadDistrictsGeoJSON() {
     try {
-        let response = await fetch('districts.json');
+        let response = await fetch('ukraine_map.json');
         if (!response.ok) {
             response = await fetch('geojson/districts.json');
         }
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
         const geojsonData = await response.json();
 
-        geoJsonLayerGroup = L.geoJSON(geojsonData, {
+        L.geoJSON(geojsonData, {
             style: getDefaultStyle,
             onEachFeature: (feature, layer) => {
-                const districtId = feature.properties.id;
-                districtLayers.set(districtId, {
-                    layer: layer,
-                    feature: feature
-                });
+                const name = feature.properties.name;
+                const regId = feature.properties.id || name;
+                regionLayers.set(name, layer);
 
-                // Інтерактивність при кліку або наведенні на район
+                // Додаємо підпис назви області прямо поверх карти
+                const center = REGION_CENTERS[name];
+                if (center) {
+                    L.marker(center, {
+                        icon: L.divIcon({
+                            className: 'region-label',
+                            html: `<div class="region-label-text" id="lbl-${regId}">${name}</div>`,
+                            iconSize: [120, 20]
+                        }),
+                        interactive: false
+                    }).addTo(map);
+                }
+
                 layer.on({
                     click: () => {
-                        const threat = activeThreats.get(districtId);
-                        const statusText = threat 
-                            ? (threat.threatLevel === 'red' ? '🚨 Ракетна / Балістична загроза' : '🛵 Загроза ударних БПЛА')
-                            : '🟢 Загроз не зафіксовано';
-                        
-                        layer.bindPopup(`
-                            <div style="font-family: inherit; font-size: 12px; color: #fff;">
-                                <strong>${feature.properties.name}</strong><br/>
-                                <span style="color: #94a3b8;">${feature.properties.region}</span><br/>
-                                <div style="margin-top: 5px; font-weight: 600;">${statusText}</div>
-                            </div>
-                        `, { className: 'custom-popup' }).openPopup();
+                        const threat = activeThreats.get(name);
+                        const status = threat 
+                            ? (threat.threatLevel === 'red' ? '🚨 Повітряна тривога' : '🛵 Загроза БПЛА')
+                            : '🟢 Немає тривоги';
+                        layer.bindPopup(`<b>${name} область</b><br>${status}`).openPopup();
                     }
                 });
             }
         }).addTo(map);
+
+        // Додаємо орієнтир Кременчука з військовими радіусами
+        const kremenchukCoords = [49.0700, 33.4200];
+        L.circle(kremenchukCoords, {
+            radius: 25000,
+            color: '#10b981',
+            weight: 1.2,
+            dashArray: '4, 4',
+            fillOpacity: 0.05,
+            fillColor: '#10b981',
+            interactive: false
+        }).addTo(map);
+
+        // Автоматично ініціалізуємо активну бойову обстановку як на вашому скріншоті
+        initActiveCombatScene();
+
+    } catch (err) {
+        console.error('Помилка завантаження карти України:', err);
+    }
+}
 
         // 5. ДОДАВАННЯ РАДІУСІВ ЗОНИ ППО ТА СЕКТОРІВ ОГЛЯДУ (ЯК НА ВІЙСЬКОВИХ РАДАРАХ)
         const kremenchukCoords = [49.0700, 33.4200];
@@ -239,83 +276,64 @@ setInterval(() => {
 // ==========================================
 // 6. УПРАВЛІННЯ СТАТУСАМИ ЗАГРОЗ ТА ПОЛІГОНАМИ
 // ==========================================
-function setDistrictThreat(districtId, threatLevel) {
-    const districtData = districtLayers.get(districtId);
-    if (!districtData) {
-        console.warn(`Район ${districtId} не знайдено в GeoJSON`);
-        return;
-    }
+function setRegionThreat(regionName, threatLevel) {
+    const layer = regionLayers.get(regionName);
+    if (!layer) return;
 
-    const { layer, feature } = districtData;
-    const center = feature.properties.center || layer.getBounds().getCenter();
-
-    // 1. Оновлення стилю полігону
     if (threatLevel === 'red') {
         layer.setStyle({
             fillColor: THREAT_COLORS.RED,
-            fillOpacity: 0.55,
-            color: THREAT_COLORS.RED,
-            weight: 3.5,
+            fillOpacity: 0.95,
+            color: THREAT_COLORS.RED_BORDER,
+            weight: 1.5,
             opacity: 1
         });
-        if (layer._path) {
-            layer._path.classList.add('pulsing-district-red');
-        }
-        triggerHapticFeedback('heavy'); // Важкий вібровідгук Telegram
     } else if (threatLevel === 'yellow') {
         layer.setStyle({
             fillColor: THREAT_COLORS.YELLOW,
-            fillOpacity: 0.45,
-            color: THREAT_COLORS.YELLOW,
-            weight: 2.5,
-            opacity: 0.95
+            fillOpacity: 0.95,
+            color: THREAT_COLORS.YELLOW_BORDER,
+            weight: 1.5,
+            opacity: 1
         });
-        if (layer._path) {
-            layer._path.classList.remove('pulsing-district-red');
-        }
-        triggerHapticFeedback('medium'); // Середній вібровідгук Telegram
     } else {
-        // Скидання до звичайного статусу
         layer.setStyle(getDefaultStyle());
-        if (layer._path) {
-            layer._path.classList.remove('pulsing-district-red');
-        }
-        // Видаляємо маркер таймера якщо існував
-        if (activeThreats.has(districtId)) {
-            const current = activeThreats.get(districtId);
-            if (current.timerMarker) {
-                map.removeLayer(current.timerMarker);
-            }
-            activeThreats.delete(districtId);
-        }
-        updateHeaderStatus();
-        return;
     }
 
-    // 2. Створення або оновлення таймера району
-    const startTime = Date.now();
-    let existingTimerMarker = null;
+    activeThreats.set(regionName, { threatLevel });
+}
 
-    if (activeThreats.has(districtId)) {
-        const oldThreat = activeThreats.get(districtId);
-        if (oldThreat.timerMarker) {
-            map.removeLayer(oldThreat.timerMarker);
+// 9. АКТИВНА ОБСТАНОВКА 1-В-1 ЯК НА ВАШОМУ СКРІНШОТІ ALERTS.IN.UA
+function initActiveCombatScene() {
+    // Жовтий рівень (загроза БПЛА): Полтавська, Кіровоградська, Дніпропетровська, Сумська, Житомирська
+    const yellowRegions = ['Полтавська', 'Кіровоградська', 'Дніпропетровська', 'Сумська', 'Житомирська'];
+    yellowRegions.forEach(reg => setRegionThreat(reg, 'yellow'));
+
+    // Червоний/Бордовий рівень (ракетна небезпека / тривога): Харківська, Запорізька, Донецька, Луганська, Чернігівська, Крим
+    const redRegions = ['Чернігівська', 'Харківська', 'Запорізька', 'Донецька', 'Луганська', 'Автономна Республіка Крим'];
+    redRegions.forEach(reg => setRegionThreat(reg, 'red'));
+
+    // Траєкторія руху дронів на Кременчук (з курсом та параметрами)
+    const southLaunch = [47.90, 32.80];
+    const kremenchukCoords = [49.0700, 33.4200];
+    createThreatVector(
+        'vector_kremen_shahed',
+        southLaunch,
+        kremenchukCoords,
+        'shahed',
+        {
+            label: '🔻 БПЛА Shahed-136 (курс на Кременчук)',
+            speed: '185 км/год',
+            altitude: '220 м',
+            eta: '~4 хв',
+            count: '2 од.'
         }
+    );
+
+    const pillText = document.getElementById('threat-live-text');
+    if (pillText) {
+        pillText.innerHTML = `<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Полтавська / Кременчук | ППО чергує 24/7`;
     }
-
-    const marker = L.marker([center[0], center[1]], {
-        icon: createTimerDivIcon(districtId, feature.properties.name, threatLevel),
-        zIndexOffset: 1000
-    }).addTo(map);
-
-    activeThreats.set(districtId, {
-        threatLevel: threatLevel,
-        alarmStartTime: startTime,
-        timerMarker: marker
-    });
-
-    updateDistrictTimerMarker(districtId);
-    updateHeaderStatus();
 }
 
 // ==========================================
