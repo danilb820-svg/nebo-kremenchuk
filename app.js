@@ -181,6 +181,9 @@ async function loadDistrictsGeoJSON() {
         addRadarLabel(49.52, 33.42, 'СЕКТОР ЗРК 50КМ', '#3b82f6');
         addRadarLabel(49.95, 33.42, 'ДАЛЬНІЙ РУБІЖ 100КМ', '#64748b');
 
+        // Автоматично ініціалізуємо активну бойову обстановку над Кременчуком
+        initActiveCombatScene();
+
     } catch (err) {
         console.error('Помилка завантаження geojson/districts.json:', err);
     }
@@ -430,36 +433,14 @@ function updateHeaderStatus() {
 }
 
 // ==========================================
-// 9. СИМУЛЯТОР ТРИВОГ (BOTTOM BAR) - ФОКУС КРЕМЕНЧУК
+// 9. АВТОНОМНИЙ РЕЖИМ БОЙОВОГО МОНІТОРИНГУ (МАПА ТРИВОГ)
 // ==========================================
-document.getElementById('btn-ballistika').addEventListener('click', () => {
-    // 1. Встановлюємо червону загрозу в Кременчуцький район
-    setDistrictThreat('poltava_kremenchuk', 'red');
-
-    // 2. Будуємо тактичний вектор балістичної ракети на Кременчук
-    const launchCoords = [51.50, 35.80]; // Район пуску
-    const kremenchukCoords = [49.0700, 33.4200]; // Кременчук
-    createThreatVector(
-        'vector_kremenchuk_ballistic',
-        launchCoords,
-        kremenchukCoords,
-        'ballistic',
-        {
-            label: '🚀 Балістична ракета (Іскандер-М)',
-            speed: '6500 км/год',
-            altitude: '45 км',
-            eta: '~1.5 хв',
-            count: '1 од.'
-        }
-    );
-});
-
-document.getElementById('btn-shahedy').addEventListener('click', () => {
-    // 1. Встановлюємо жовту загрозу в Кременчуцький та Олександрійський райони
+function initActiveCombatScene() {
+    // Встановлюємо активний статус загрози для Кременчуцького району
     setDistrictThreat('poltava_kremenchuk', 'yellow');
     setDistrictThreat('kirovohrad_oleksandriia', 'yellow');
 
-    // 2. Будуємо вектор руху БПЛА з боку Павлиша та Олександрії на Кременчук
+    // Відображаємо ціль: БПЛА Shahed-136, що йде курсом через Павлиш на Кременчук
     const southLaunch = [47.80, 32.70];
     const kremenchukCoords = [49.0700, 33.4200];
     createThreatVector(
@@ -468,27 +449,19 @@ document.getElementById('btn-shahedy').addEventListener('click', () => {
         kremenchukCoords,
         'shahed',
         {
-            label: '🔻 БПЛА Shahed-136 (через Павлиш)',
+            label: '🔻 БПЛА Shahed-136 (курс на місто)',
             speed: '185 км/год',
-            altitude: '250 м',
-            eta: '~6 хв',
-            count: '4 од.'
+            altitude: '220 м',
+            eta: '~4 хв',
+            count: '2 од.'
         }
     );
-});
 
-document.getElementById('btn-clear').addEventListener('click', () => {
-    // Скидаємо всі активні райони
-    const activeIds = Array.from(activeThreats.keys());
-    activeIds.forEach(id => setDistrictThreat(id, 'default'));
-
-    // Видаляємо всі вектори
-    clearAllVectors();
-
-    if (tg && tg.HapticFeedback) {
-        tg.HapticFeedback.notificationOccurred('success');
+    const pillText = document.getElementById('threat-live-text');
+    if (pillText) {
+        pillText.innerHTML = `<span style="color:#f59e0b">⚠️ Загроза БПЛА:</span> Кременчук / Павлиш (2 борти)`;
     }
-});
+}
 
 // ==========================================
 // 10. ТОЧКИ ПІДКЛЮЧЕННЯ РЕАЛЬНОГО API / WEBSOCKET
