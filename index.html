@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Карта загроз та тривог</title>
+    <title>Мапа тривог — Оперативний моніторинг</title>
 
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -11,57 +11,208 @@
     <!-- Leaflet.js CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
-    <!-- Google Fonts -->
+    <!-- Google Fonts: Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
-    <!-- Custom Styles (з примусовим оновленням кешу) -->
-    <link rel="stylesheet" href="style.css?v=5.0" />
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="style.css?v=6.0" />
 </head>
-<body>
-    <!-- Top Status Header -->
-    <header class="app-header">
-        <div class="header-left">
-            <img src="avatar.jpg" alt="Логотип Небо Кременчука" class="channel-header-avatar" />
-            <div class="radar-indicator">
-                <span class="radar-dot"></span>
-            </div>
-            <div class="header-text">
-                <div class="app-title">Небо Кременчука</div>
-                <div class="app-subtitle" id="threat-summary">Кременчук та район у нормі</div>
-            </div>
-        </div>
-        <div class="header-badge" id="active-alarms-badge">0 активних</div>
-    </header>
+<body data-theme="dark">
+
+    <!-- Верхня панель вибору джерела (точно як на скріншоті) -->
+    <div class="top-source-bar" id="top-source-bar">
+        <span class="source-bar-title">Рух об'єктів:</span>
+        <button class="source-btn active" data-source="auto" id="src-btn-auto">
+            <span class="source-dot live"></span> Авто
+        </button>
+        <span class="source-pipe">|</span>
+        <button class="source-btn" data-source="1" id="src-btn-1">
+            <span class="source-dot"></span> Джерело 1
+        </button>
+        <span class="source-pipe">|</span>
+        <button class="source-btn" data-source="2" id="src-btn-2">
+            <span class="source-dot"></span> Джерело 2
+        </button>
+        <span class="source-pipe">|</span>
+        <button class="source-btn" data-source="3" id="src-btn-3">
+            <span class="source-dot"></span> Джерело 3
+        </button>
+        <span class="source-pipe">|</span>
+    </div>
 
     <!-- Leaflet Map Container -->
     <div id="map"></div>
 
-    <!-- Legend Overlay -->
-    <div class="map-legend">
-        <div class="legend-item">
-            <span class="legend-bullet red"></span>
-            <span>Ракетна / Балістика</span>
+    <!-- Права вертикальна панель керування (як на alerts.in.ua) -->
+    <div class="side-toolbar">
+        <button class="tool-btn" id="btn-menu" title="Меню">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+        </button>
+        <button class="tool-btn" id="btn-sound" title="Звук тривог">
+            <svg id="icon-sound-on" viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            <svg id="icon-sound-off" class="hidden" viewBox="0 0 24 24"><path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+        </button>
+        <button class="tool-btn" id="btn-settings" title="Налаштування карти">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        </button>
+        <button class="tool-btn" id="btn-center" title="Центрувати на Кременчук">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+        </button>
+        <button class="tool-btn" id="btn-layers" title="Шари та райони">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="m11.99 18.54-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27zM12 16l7.36-5.73L21 9.07l-9-7-9 7 1.63 1.27zm0-11.47L17.74 9 12 13.47 6.26 9z"/></svg>
+        </button>
+        <button class="tool-btn text-btn" id="btn-record" title="Чергування наживо">
+            <span class="live-dot-red"></span>
+        </button>
+        <button class="tool-btn text-btn" id="btn-lang" title="Мова інтерфейсу">UA</button>
+        <button class="tool-btn" id="btn-edit" title="Деталізація">
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
+    </div>
+
+    <!-- Нижня ліва плашка зі статусом (як на скріншоті) -->
+    <div class="bottom-left-widget">
+        <div class="widget-row-title">
+            <span class="ua-flag-icon">🇺🇦</span> <b>Мапа тривог</b>
         </div>
-        <div class="legend-item">
-            <span class="legend-bullet yellow"></span>
-            <span>БПЛА / Шахеди</span>
+        <div class="widget-row-time" id="status-time-str">
+            Станом на: 22 вересня о 03:45 (1672 день)
         </div>
-        <div class="legend-item">
-            <span class="legend-bullet grey"></span>
-            <span>Спокійно</span>
+        <div class="widget-row-live">
+            <span class="live-status-dot"></span> Наживо: <span class="visitors-num" id="live-visitors">👥 41 820</span>
         </div>
     </div>
 
-    <!-- Інформаційна плашка знизу у стилі Мапи тривог -->
-    <div class="bottom-info-pill">
-        <span class="live-pulse"></span>
-        <span id="threat-live-text">Система ППО: чергування ведеться 24/7</span>
+    <!-- Нижня права легенда (точна копія скріншоту alerts.in.ua) -->
+    <div class="bottom-right-legend" id="map-legend">
+        <div class="legend-row">
+            <span class="legend-box alert-red"></span>
+            <span>Повітряна тривога (червоний рівень)</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-box alert-yellow"></span>
+            <span>Повітряна тривога (жовтий рівень)</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-sym kab">🚫</span>
+            <span>Загроза застосування КАБ</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-sym danger">⚠️</span>
+            <span>Підвищена небезпека</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-sym strike-drone">🔺</span>
+            <span>Ударні/імітаційні БпЛА</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-sym jet-drone">⚡</span>
+            <span>Реактивні БпЛА</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-box alert-art"></span>
+            <span>Загроза артобстрілу</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-box alert-street"></span>
+            <span>Загроза вуличних боїв</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-box alert-potential"></span>
+            <span>Потенційні загрози</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-box alert-none"></span>
+            <span>Немає інформації про тривогу</span>
+        </div>
+        <div class="legend-row">
+            <span class="legend-box alert-occupied"></span>
+            <span>Тимчасово окуповані території</span>
+        </div>
+    </div>
+
+    <!-- Інтерактивне вікно налаштувань (⚙️) -->
+    <div class="modal-backdrop hidden" id="settings-modal">
+        <div class="settings-dialog">
+            <div class="settings-dialog-header">
+                <h3>⚙️ Налаштування карти</h3>
+                <button class="settings-close-btn" id="close-settings-btn">&times;</button>
+            </div>
+            <div class="settings-dialog-body">
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-title">Анімація руху об'єктів</div>
+                        <div class="setting-desc">Плавний політ цілей за секторами та векторами</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="setting-anim" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-title">Радарні хвилі та імпульси</div>
+                        <div class="setting-desc">Пульсуючі кола навколо виявлених цілей</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="setting-radar" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-title">Звукові сповіщення</div>
+                        <div class="setting-desc">Тактичний звуковий сигнал при появі нової загрози</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="setting-sound">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-title">Таймери тривалості тривоги</div>
+                        <div class="setting-desc">Показувати час активної тривоги над областю</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="setting-timers" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-title">Швидкість анімації польоту</div>
+                        <div class="setting-desc">Коефіцієнт швидкості руху маркерів цілей</div>
+                    </div>
+                    <select id="setting-speed" class="custom-select">
+                        <option value="1">1x (Звичайна)</option>
+                        <option value="2" selected>2x (Швидка)</option>
+                        <option value="3">3x (Тактичний огляд)</option>
+                    </select>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-title">Візуальна тема</div>
+                        <div class="setting-desc">Стиль підкладки карти</div>
+                    </div>
+                    <select id="setting-theme" class="custom-select">
+                        <option value="dark" selected>alerts.in.ua (Темна)</option>
+                        <option value="pitch">Глибока ніч</option>
+                    </select>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Leaflet.js -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="app.js?v=5.0"></script>
+    <script src="app.js?v=6.0"></script>
 </body>
 </html>
