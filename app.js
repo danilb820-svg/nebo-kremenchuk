@@ -144,6 +144,12 @@ const activeThreats = new Map();
 const regionLayers = new Map();
 const labelMarkers = new Map();
 
+// Активні загрози за окремими районами України (Скріншот alerts.in.ua)
+const activeDistrictThreats = new Map();
+const districtLayers = new Map();
+const districtLabelMarkers = new Map();
+const durationPillMarkers = new Map();
+
 // Сховище анімованих цілей: Map<id, TargetObject>
 const tacticalTargets = new Map();
 
@@ -151,8 +157,8 @@ const tacticalTargets = new Map();
 // 3. ІНІЦІАЛІЗАЦІЯ LEAFLET
 // ==========================================
 const map = L.map('map', {
-    center: [49.0700, 33.4200], // Кременчук у фокусі
-    zoom: 8,
+    center: [49.0, 33.2], // Огляд усієї території України (як на скріншоті)
+    zoom: 6.7,
     minZoom: 5,
     maxZoom: 14,
     zoomControl: false,
@@ -166,7 +172,7 @@ const darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z
 }).addTo(map);
 
 // ==========================================
-// 4. ЗАВАНТАЖЕННЯ GEOJSON ОБЛАСТЕЙ
+// 4. ЗАВАНТАЖЕННЯ GEOJSON ОБЛАСТЕЙ ТА РАЙОНІВ
 // ==========================================
 function findCanonical(name) {
     if (!name) return null;
@@ -250,6 +256,140 @@ function refreshAllOblastStyles() {
     });
 }
 
+// Завантаження районів України (districts.json)
+async function loadDistrictsData() {
+    try {
+        let data = null;
+        const res = await fetch('districts.json');
+        if (res.ok) data = await res.json();
+
+        if (!data) {
+            const r2 = await fetch('geojson/districts.json');
+            if (r2.ok) data = await r2.json();
+        }
+
+        if (data && Array.isArray(data.features)) {
+            L.geoJSON(data, {
+                style: (f) => {
+                    const name = f.properties?.name || '';
+                    const threat = activeDistrictThreats.get(name);
+                    if (threat === 'yellow') {
+                        return {
+                            fillColor: '#b8860b',
+                            fillOpacity: 0.78,
+                            color: '#eab308',
+                            weight: 1.6
+                        };
+                    } else if (threat === 'red') {
+                        return {
+                            fillColor: '#6b1724',
+                            fillOpacity: 0.84,
+                            color: '#ef4444',
+                            weight: 1.8
+                        };
+                    }
+                    return {
+                        fillColor: 'transparent',
+                        fillOpacity: 0,
+                        color: 'rgba(255, 255, 255, 0.08)',
+                        weight: 0.7
+                    };
+                },
+                onEachFeature: (f, layer) => {
+                    const name = f.properties?.name || '';
+                    const center = f.properties?.center;
+                    districtLayers.set(name, layer);
+
+                    if (center) {
+                        createDistrictLabelMarker(name, center, f.properties?.region);
+                    }
+                }
+            }).addTo(map);
+        }
+    } catch (e) {
+        console.warn('Districts load note:', e);
+    }
+}
+
+function createDistrictLabelMarker(name, center, region) {
+    const threat = activeDistrictThreats.get(name);
+    const isVisible = (DISPLAY_SETTINGS.districts === 'all') || 
+                      (DISPLAY_SETTINGS.districts === 'alarm_only' && threat);
+
+    const icon = L.divIcon({
+        className: 'district-label-wrap',
+        html: `
+            <div class="district-label-text ${threat ? 'active-threat' : ''}" style="${isVisible ? '' : 'display:none;'}">
+                ${name}
+            </div>
+        `,
+        iconSize: [90, 20],
+        iconAnchor: [45, 10]
+    });
+
+    const m = L.marker(center, { icon, interactive: false }).addTo(map);
+    districtLabelMarkers.set(name, m);
+}
+
+function updateDistrictLabels() {
+    districtLabelMarkers.forEach((m, name) => {
+        const threat = activeDistrictThreats.get(name);
+        const isVisible = (DISPLAY_SETTINGS.districts === 'all') || 
+                          (DISPLAY_SETTINGS.districts === 'alarm_only' && threat);
+        const el = m.getElement()?.querySelector('.district-label-text');
+        if (el) {
+            el.style.display = isVisible ? 'block' : 'none';
+            if (threat) {
+                el.classList.add('active-threat');
+            } else {
+                el.classList.remove('active-threat');
+            }
+        }
+    });
+}
+
+function setDistrictThreat(name, level = 'yellow') {
+    activeDistrictThreats.set(name, level);
+    const layer = districtLayers.get(name);
+    if (layer) {
+        layer.setStyle({
+            fillColor: level === 'yellow' ? '#b8860b' : '#6b1724',
+            fillOpacity: 0.78,
+            color: level === 'yellow' ? '#eab308' : '#ef4444',
+            weight: 1.6
+        });
+    }
+    updateDistrictLabels();
+}
+
+function clearDistrictThreat(name) {
+    activeDistrictThreats.delete(name);
+    const layer = districtLayers.get(name);
+    if (layer) {
+        layer.setStyle({
+            fillColor: 'transparent',
+            fillOpacity: 0,
+            color: 'rgba(255, 255, 255, 0.08)',
+            weight: 0.7
+        });
+    }
+    updateDistrictLabels();
+}
+
+function createDurationPillMarker(id, latlng, text) {
+    if (durationPillMarkers.has(id)) {
+        map.removeLayer(durationPillMarkers.get(id));
+    }
+    const icon = L.divIcon({
+        className: 'threat-time-pill-wrap',
+        html: `<div class="threat-time-pill">${text}</div>`,
+        iconSize: [110, 22],
+        iconAnchor: [55, 11]
+    });
+    const m = L.marker(latlng, { icon, interactive: false }).addTo(map);
+    durationPillMarkers.set(id, m);
+}
+
 async function loadMapData() {
     try {
         let geo = null;
@@ -280,6 +420,9 @@ async function loadMapData() {
                 }
             }).addTo(map);
         }
+
+        // Завантажуємо райони
+        await loadDistrictsData();
 
         createRegionLabels();
         createKremenchukMarker();
@@ -441,32 +584,72 @@ function addTacticalTarget(opts) {
     let flightLine = null;
     if (!isExplosion) {
         flightLine = L.polyline([fromLatLng, toLatLng], {
-            color: isBallistic ? '#ef4444' : (isKab ? '#ef4444' : '#f59e0b'),
-            weight: 3,
+            color: isBallistic ? '#ef4444' : (isKab ? '#ef4444' : '#cbd5e1'),
+            weight: 2.5,
             opacity: 0.85,
-            dashArray: isBallistic ? '4, 8' : '8, 8',
+            dashArray: '6, 8',
             className: 'animated-flight-line'
         }).addTo(map);
     }
 
-    // Іконка цілі: якщо вибух — ставимо вибух 💥 замість шахеда чи ракети
-    const iconChar = isExplosion ? '💥' : (isBallistic ? '🚀' : (isKab ? '🚫' : '🔻'));
-    const typeClass = isExplosion ? 'explosion' : (isBallistic ? 'ballistic' : (isKab ? 'kab' : 'shahed'));
+    // Кут нахилу до цілі
+    const heading = calculateBearing(fromLatLng[0], fromLatLng[1], toLatLng[0], toLatLng[1]);
+
+    // Іконка цілі у стилі alerts.in.ua (червоний круглий бейдж або фіолетовий дрон)
+    let markerHtml = '';
+    let markerSize = [28, 28];
+    let markerAnchor = [14, 14];
+
+    if (isExplosion) {
+        markerHtml = `
+            <div class="target-icon-body explosion" id="icon-body-${id}">💥</div>
+            <div class="radar-pulse-ring shockwave" id="ring-${id}"></div>
+        `;
+        markerSize = [34, 34];
+        markerAnchor = [17, 17];
+    } else if (opts.badgeType === 'purple') {
+        markerHtml = `
+            <div class="purple-drone-badge" id="icon-body-${id}">
+                <svg viewBox="0 0 24 24" style="width:14px;height:14px;transform:rotate(${heading}deg);"><path fill="#ffffff" d="M12 2L2 22L12 18L22 22L12 2Z"/></svg>
+            </div>
+            ${SETTINGS.radarPingsEnabled ? `<div class="radar-pulse-ring shahed" id="ring-${id}"></div>` : ''}
+        `;
+        markerSize = [24, 24];
+        markerAnchor = [12, 12];
+    } else {
+        // Червоний круглий бейдж зі стрілкою/силуетом у напрямку польоту
+        markerHtml = `
+            <div class="threat-circle-badge" id="icon-body-${id}">
+                <svg viewBox="0 0 24 24" style="transform: rotate(${heading}deg);">
+                    <path fill="#ffffff" d="M12 2L16 9L13 18L12 22L11 18L8 9L12 2Z"/>
+                </svg>
+            </div>
+            ${(SETTINGS.radarPingsEnabled || opts.hasPulsingRings) ? `<div class="radar-pulse-ring ${isBallistic ? 'ballistic' : 'shahed'}" id="ring-${id}"></div>` : ''}
+        `;
+    }
 
     const markerIcon = L.divIcon({
         className: 'tactical-target-marker',
-        html: `
-            <div class="target-icon-body ${typeClass}" id="icon-body-${id}">${iconChar}</div>
-            ${SETTINGS.radarPingsEnabled ? `<div class="radar-pulse-ring ${isExplosion ? 'shockwave' : ''}" id="ring-${id}"></div>` : ''}
-        `,
-        iconSize: isExplosion ? [34, 34] : [28, 28],
-        iconAnchor: isExplosion ? [17, 17] : [14, 14]
+        html: markerHtml,
+        iconSize: markerSize,
+        iconAnchor: markerAnchor
     });
 
     const marker = L.marker(fromLatLng, { icon: markerIcon, zIndexOffset: isExplosion ? 2500 : 1500 }).addTo(map);
 
-    // Кут нахилу до цілі
-    const heading = calculateBearing(fromLatLng[0], fromLatLng[1], toLatLng[0], toLatLng[1]);
+    // Додаємо плашку часу підльоту (наприклад "13 хв.") прямо на траєкторію
+    let etaMarker = null;
+    if (opts.etaBadge && flightLine) {
+        const midLat = (fromLatLng[0] + toLatLng[0]) / 2;
+        const midLng = (fromLatLng[1] + toLatLng[1]) / 2;
+        const etaIcon = L.divIcon({
+            className: 'flight-eta-container',
+            html: `<div class="flight-eta-badge">${opts.etaBadge}</div>`,
+            iconSize: [50, 18],
+            iconAnchor: [25, 9]
+        });
+        etaMarker = L.marker([midLat, midLng], { icon: etaIcon, interactive: false }).addTo(map);
+    }
 
     const targetObj = {
         id,
@@ -480,6 +663,7 @@ function addTacticalTarget(opts) {
         heading,
         line: flightLine,
         marker,
+        etaMarker,
         label: opts.label || (isExplosion ? '💥 Вибух / Робота ППО' : (isBallistic ? 'Швидкісна ракета' : 'БпЛА Shahed-136')),
         meta: opts.meta || {}
     };
@@ -500,10 +684,10 @@ function addTacticalTarget(opts) {
             <div class="popup-box">
                 <div class="popup-title">${targetObj.label}</div>
                 <div class="popup-body">
-                    • Тип: <b>${isBallistic ? 'Балістика' : 'Ударний дрон'}</b><br>
-                    • Сектор: <b>${opts.meta?.sector || 'Курс на Кременчук'}</b><br>
-                    • Швидкість: <b>${opts.meta?.speed || (isBallistic ? '2800 км/год' : '185 км/год')}</b><br>
-                    • Час підльоту: <b>${opts.meta?.eta || '~3-5 хв'}</b>
+                    • Тип: <b>${isBallistic ? 'Балістика / Ракета' : 'Ударний дрон Shahed'}</b><br>
+                    • Сектор: <b>${opts.meta?.sector || 'Курс на ціль'}</b><br>
+                    • Швидкість: <b>${opts.meta?.speed || (isBallistic ? '2400 км/год' : '185 км/год')}</b><br>
+                    • Час підльоту: <b>${opts.meta?.eta || opts.etaBadge || '~3-5 хв'}</b>
                 </div>
             </div>
         `;
@@ -526,6 +710,7 @@ function removeTacticalTarget(id) {
     if (existing) {
         if (existing.line) map.removeLayer(existing.line);
         if (existing.marker) map.removeLayer(existing.marker);
+        if (existing.etaMarker) map.removeLayer(existing.etaMarker);
         tacticalTargets.delete(id);
     }
 }
@@ -621,9 +806,11 @@ function filterTargetsByActiveSource() {
         if (isVisible) {
             if (!map.hasLayer(t.marker)) map.addLayer(t.marker);
             if (t.line && !map.hasLayer(t.line)) map.addLayer(t.line);
+            if (t.etaMarker && !map.hasLayer(t.etaMarker)) map.addLayer(t.etaMarker);
         } else {
             if (map.hasLayer(t.marker)) map.removeLayer(t.marker);
             if (t.line && map.hasLayer(t.line)) map.removeLayer(t.line);
+            if (t.etaMarker && map.hasLayer(t.etaMarker)) map.removeLayer(t.etaMarker);
         }
     });
 }
@@ -809,51 +996,124 @@ function initCombatSceneFromParams() {
         return;
     }
 
-    // Тактична обстановка за замовчуванням
-    setOblastThreat('Полтавська', 'red');
-    setOblastThreat('Черкаська', 'red');
-    setOblastThreat('Кіровоградська', 'red');
-    setOblastThreat('Чернігівська', 'yellow');
-    setOblastThreat('Харківська', 'red');
-    setOblastThreat('Дніпропетровська', 'red');
+    // Повноцінна тактична обстановка по всій Україні (точно як на alerts.in.ua скріншоті)
+    // 1. Області в червоній зоні тривоги
     setOblastThreat('Донецька', 'red');
-    setOblastThreat('Одеська', 'yellow');
+    setOblastThreat('Луганська', 'red');
+    setOblastThreat('АР Крим', 'red');
+    setOblastThreat('м. Севастополь', 'red');
+    setOblastThreat('Запорізька', 'red');
 
-    // Ціль 1 від Джерела 1 (через Павлиш на Кременчук)
+    // 2. Райони в жовтій зоні (Загроза Шахедів / БпЛА)
+    setDistrictThreat('Бучанський', 'yellow');
+    setDistrictThreat('Фастівський', 'yellow');
+    setDistrictThreat('Обухівський', 'yellow');
+    setDistrictThreat('Бориспільський', 'yellow');
+
+    setDistrictThreat('Самарівський', 'yellow');
+    setDistrictThreat('Павлоградський', 'yellow');
+    setDistrictThreat('Синельниківський', 'yellow');
+    setDistrictThreat('Лозівський', 'yellow');
+    setDistrictThreat('Берестинський', 'yellow');
+
+    // Райони в червоній зоні (Ракетна / Артилерійська небезпека)
+    setDistrictThreat('Запорізький', 'red');
+    setDistrictThreat('смт Новомиколаївка', 'red');
+    setDistrictThreat('Василівський', 'red');
+    setDistrictThreat('Пологівський', 'red');
+    setDistrictThreat('Бердянський', 'red');
+    setDistrictThreat('Мелітопольський', 'red');
+
+    setDistrictThreat('Донецький', 'red');
+    setDistrictThreat('Волноваський', 'red');
+    setDistrictThreat('Покровський', 'red');
+    setDistrictThreat('Бахмутський', 'red');
+    setDistrictThreat('Краматорський', 'red');
+    setDistrictThreat('Маріупольський', 'red');
+    setDistrictThreat('Горлівський', 'red');
+
+    // 3. Траєкторії та живі цілі по Україні
+    // Вектор 1: Чернігівщина -> Київщина (з плашкою "13 хв.")
     addTacticalTarget({
-        id: 'target_src_1',
+        id: 'target_chernihiv_kyiv',
         type: 'shahed',
         sourceIndex: 1,
-        fromCoords: [48.50, 32.85],
-        toCoords: [49.07, 33.42],
-        label: '🔻 БпЛА Shahed-136 (через Павлиш)',
-        speedFactor: 0.0012,
-        meta: { sector: 'Павлиш / Раківка', speed: '185 км/год', eta: '~4 хв' }
+        fromCoords: [51.30, 31.15],
+        toCoords: [50.35, 30.65],
+        label: '🔻 БпЛА Shahed-136 (Гончарівське -> Київщина)',
+        speedFactor: 0.0013,
+        etaBadge: '13 хв.',
+        meta: { sector: 'Чернігівський -> Бровари / Обухів', speed: '185 км/год', eta: '~13 хв' }
     });
 
-    // Ціль 2 від Джерела 2 (через Градизьк над водосховищем)
+    // Дрон над Борисполем (фіолетовий квадрат)
     addTacticalTarget({
-        id: 'target_src_2',
+        id: 'target_boryspil_drone',
+        type: 'shahed',
+        badgeType: 'purple',
+        sourceIndex: 1,
+        fromCoords: [50.45, 30.70],
+        toCoords: [50.15, 30.60],
+        label: '⚡ БпЛА Shahed (район Борисполя/Обухова)',
+        speedFactor: 0.0009,
+        meta: { sector: 'Бориспільський / Обухівський', speed: '175 км/год', eta: '~5 хв' }
+    });
+
+    // Вектор 2: Павлоград / Самарівський сектор (з плашкою "4 хв.")
+    addTacticalTarget({
+        id: 'target_pavlohrad',
         type: 'shahed',
         sourceIndex: 2,
-        fromCoords: [49.32, 32.90],
-        toCoords: [49.07, 33.42],
-        label: '🔻 БпЛА Shahed-136 (Градизьк)',
-        speedFactor: 0.0014,
-        meta: { sector: 'Градизьк / Піщане', speed: '190 км/год', eta: '~5 хв' }
+        fromCoords: [48.35, 36.35],
+        toCoords: [48.65, 35.35],
+        label: '🔻 БпЛА Shahed-136 (Павлоград / Самар)',
+        speedFactor: 0.0012,
+        etaBadge: '4 хв.',
+        meta: { sector: 'Павлоградський -> Самарівський', speed: '190 км/год', eta: '~4 хв' }
     });
 
-    // Ціль 3 від Джерела 3 (по східному рубежу Горішні Плавні)
+    // Вектор 3: Запоріжжя / Новомиколаївка
     addTacticalTarget({
-        id: 'target_src_3',
-        type: 'shahed',
-        sourceIndex: 3,
-        fromCoords: [48.95, 33.85],
-        toCoords: [49.07, 33.42],
-        label: '🔻 БпЛА Shahed-136 (Дніпровський рубіж)',
-        speedFactor: 0.0011,
-        meta: { sector: 'Горішні Плавні / Потоки', speed: '180 км/год', eta: '~6 хв' }
+        id: 'target_zaporizhia',
+        type: 'ballistic',
+        sourceIndex: 1,
+        fromCoords: [47.50, 35.80],
+        toCoords: [48.10, 35.90],
+        label: '🚀 Загроза балістики / авіаудару (Запоріжжя)',
+        speedFactor: 0.0024,
+        meta: { sector: 'Запорізький / Новомиколаївка', speed: '2400 км/год', eta: '~2 хв' }
     });
+
+    // Вектор 4: Мелітополь / Василівка
+    addTacticalTarget({
+        id: 'target_melitopol',
+        type: 'shahed',
+        sourceIndex: 2,
+        fromCoords: [46.50, 35.10],
+        toCoords: [47.10, 35.60],
+        label: '🔻 БпЛА з півдня (Мелітопольський напрямок)',
+        speedFactor: 0.0011,
+        meta: { sector: 'Мелітопольський -> Василівський', speed: '180 км/год', eta: '~8 хв' }
+    });
+
+    // Вектор 5: Донецький сектор (радарне пульсуюче кільце на зоні ураження)
+    addTacticalTarget({
+        id: 'target_donetsk_zone',
+        type: 'kab',
+        sourceIndex: 1,
+        fromCoords: [48.01, 37.80],
+        toCoords: [48.01, 37.80],
+        label: '💣 Загроза КАБ / Артобстрілу (Донецький фронт)',
+        speedFactor: 0,
+        hasPulsingRings: true,
+        meta: { sector: 'Донецький / Волноваський', speed: 'Фронтова зона', eta: 'Активно' }
+    });
+
+    // 4. Плашки тривалості на мапі (як на скріншоті alerts.in.ua)
+    createDurationPillMarker('pill_kyiv', [49.95, 30.50], '3 хв. - 13 хв.');
+    createDurationPillMarker('pill_pavlohrad', [48.85, 35.75], '4 хв. - 9 год. 1 хв.');
+    createDurationPillMarker('pill_donetsk', [47.85, 38.30], '1831 д. 9 год.');
+    createDurationPillMarker('pill_crimea', [45.10, 34.20], '1381 д. 3 год.');
 }
 
 // ==========================================
@@ -888,6 +1148,20 @@ function handleIncomingLivePayload(p) {
         return;
     }
 
+    // Синхронізація районів у реальному часі
+    if (Array.isArray(p.activeDistricts)) {
+        activeDistrictThreats.clear();
+        p.activeDistricts.forEach(distName => {
+            const clean = distName.replace(/район|громада|територіальна|м\./g, '').trim();
+            for (const [dName] of districtLayers.entries()) {
+                if (dName.includes(clean) || clean.includes(dName)) {
+                    setDistrictThreat(dName, 'yellow');
+                }
+            }
+        });
+    }
+
+    // Синхронізація областей у реальному часі
     if (Array.isArray(p.activeRegions)) {
         clearAllThreats();
         p.activeRegions.forEach(r => setOblastThreat(r, 'red'));

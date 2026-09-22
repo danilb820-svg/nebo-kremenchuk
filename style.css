@@ -379,6 +379,133 @@ html, body {
     cursor: pointer;
 }
 
+/* Точні бейджі загроз alerts.in.ua зі скріншоту: */
+
+/* 1. Червоний круглий маркер з білим силуетом ракети/дрона */
+.threat-circle-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e11d48;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 16px rgba(225, 29, 72, 0.9), 0 2px 6px rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    z-index: 1000;
+}
+
+.threat-circle-badge:hover {
+    transform: scale(1.18);
+}
+
+.threat-circle-badge svg {
+    width: 16px;
+    height: 16px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+}
+
+/* 2. Фіолетовий маркер дрона (як над Борисполем/Києвом) */
+.purple-drone-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: #9333ea;
+    border: 1.5px solid #ffffff;
+    box-shadow: 0 0 14px rgba(147, 51, 234, 0.9), 0 2px 5px rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #ffffff;
+    cursor: pointer;
+    z-index: 1000;
+}
+
+/* 3. Плашка часу підльоту прямо на траєкторії (наприклад "13 хв.") */
+.flight-eta-badge {
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #e2e8f0;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* 4. Плашка тривалості тривоги району ("3 хв. - 13 хв.", "4 хв. - 9 год. 1 хв.") */
+.threat-time-pill {
+    background: rgba(15, 20, 28, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 6px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #cbd5e1;
+    white-space: nowrap;
+    display: inline-block;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* 5. Назви районів на мапі */
+.district-label-text {
+    font-size: 10px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 5px #0f172a;
+    white-space: nowrap;
+    pointer-events: none;
+    line-height: 1.2;
+    transition: color 0.2s ease;
+}
+
+.district-label-text.active-threat {
+    color: #fef08a;
+    font-weight: 700;
+    text-shadow: 0 0 8px rgba(234, 179, 8, 0.7), 0 1px 3px #000;
+}
+
+/* 6. Водяний знак у нижній лівій частині (як на скріншоті) */
+.map-watermark {
+    position: absolute;
+    bottom: 60px;
+    left: 235px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-family: 'Inter', sans-serif;
+    opacity: 0.35;
+    pointer-events: none;
+    user-select: none;
+}
+
+.map-watermark .wm-time {
+    font-size: 11px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+}
+
+.map-watermark .wm-source {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.map-watermark .wm-sub {
+    font-size: 10px;
+    color: #cbd5e1;
+}
+
 .target-icon-body {
     width: 24px;
     height: 24px;
