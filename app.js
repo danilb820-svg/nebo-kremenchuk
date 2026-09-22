@@ -42,6 +42,58 @@ const SETTINGS = {
     centerMode: 'kremenchuk' // 'kremenchuk' або 'all'
 };
 
+// Налаштування відображення (відповідно до скріншотів alerts.in.ua)
+const DISPLAY_SETTINGS = {
+    districts: 'all',          // 'all' | 'alarm_only' | 'district_alarm_only' | 'none'
+    cities: 'threat_only',     // 'threat_only' | 'none'
+    oblasts: 'all',            // 'all' | 'alarm_only' | 'none'
+    darkenInterval: 30,        // 0 (не змінювати), 15, 30, 45, 60 хв
+    theme: 'dark',
+    autoTheme: true,
+    threatFilters: {
+        reasons: true,
+        potential: true,
+        art: true,
+        missiles: true,
+        kabs: true,
+        highdanger: true,
+        explosions: true,
+        strikes: true,
+        works: true,
+        drones_city: true,
+        kabs_mon: true,
+        danger_mon: true
+    }
+};
+
+// Керування джерелами для підписників (Панель Адміністратора)
+const ADMIN_USER_ID = 7504043152;
+let adminBroadcastConfig = {
+    sources: [1, 2, 3], // 1: Повітряні Сили, 2: Радар району, 3: Оперативний моніторинг
+    threats: {
+        missiles: true,
+        drones: true,
+        kabs: true,
+        explosions: true
+    },
+    updatedAt: Date.now()
+};
+
+// Завантаження кешованої конфігурації
+try {
+    const cachedCfg = localStorage.getItem('admin_broadcast_config') || localStorage.getItem('cached_admin_config');
+    if (cachedCfg) {
+        adminBroadcastConfig = Object.assign(adminBroadcastConfig, JSON.parse(cachedCfg));
+    }
+} catch (e) {}
+
+function checkIfAdmin() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tgUserId = tg?.initDataUnsafe?.user?.id;
+    const localAdmin = localStorage.getItem('is_admin_mode') === '1';
+    return (tgUserId === ADMIN_USER_ID) || (urlParams.get('admin') === '1') || localAdmin;
+}
+
 // 3 АНОНІМНІ ДЖЕРЕЛА (без вказування назв чи посилань на самій карті)
 let activeSourceFilter = 'auto'; // 'auto' | '1' | '2' | '3'
 
@@ -127,6 +179,18 @@ function findCanonical(name) {
     return null;
 }
 
+function parseDurationToMinutes(str) {
+    if (!str) return 25;
+    let mins = 0;
+    const dMatch = str.match(/(\d+)\s*д/);
+    const hMatch = str.match(/(\d+)\s*год/);
+    const mMatch = str.match(/(\d+)\s*хв/);
+    if (dMatch) mins += parseInt(dMatch[1], 10) * 1440;
+    if (hMatch) mins += parseInt(hMatch[1], 10) * 60;
+    if (mMatch) mins += parseInt(mMatch[1], 10);
+    return mins || 25;
+}
+
 function getStyleForRegion(canonicalName) {
     // Окуповані території за замовчуванням
     if (canonicalName === 'АР Крим' || canonicalName === 'Луганська' || canonicalName === 'м. Севастополь') {
@@ -140,9 +204,26 @@ function getStyleForRegion(canonicalName) {
 
     const threat = activeThreats.get(canonicalName);
     if (threat === 'red') {
+        let fillColor = THREAT_COLORS.RED;
+
+        // Зміна кольору активної тривоги в залежності від її тривалості (Скріншот 1)
+        if (DISPLAY_SETTINGS.darkenInterval > 0) {
+            const durationStr = REGIONS[canonicalName]?.alertDuration || '';
+            const minutes = parseDurationToMinutes(durationStr);
+            const interval = DISPLAY_SETTINGS.darkenInterval;
+
+            if (minutes >= interval * 3) {
+                fillColor = '#24060b'; // Дуже темний (тривала тривога > 90хв)
+            } else if (minutes >= interval * 2) {
+                fillColor = '#340b12'; // Темний (> 60хв)
+            } else if (minutes >= interval) {
+                fillColor = '#45131b'; // Помірний темніший (> 30хв)
+            }
+        }
+
         return {
-            fillColor: THREAT_COLORS.RED,
-            fillOpacity: 0.80,
+            fillColor: fillColor,
+            fillOpacity: 0.85,
             color: THREAT_COLORS.RED_BORDER,
             weight: 1.8
         };
@@ -161,6 +242,12 @@ function getStyleForRegion(canonicalName) {
         color: THREAT_COLORS.DEFAULT_BORDER,
         weight: 1.1
     };
+}
+
+function refreshAllOblastStyles() {
+    regionLayers.forEach((layer, c) => {
+        layer.setStyle(getStyleForRegion(c));
+    });
 }
 
 async function loadMapData() {
@@ -220,13 +307,14 @@ function createRegionLabels() {
         if (!data.center) continue;
 
         const threat = activeThreats.get(name);
+        const shouldShowOblast = (DISPLAY_SETTINGS.oblasts === 'all') || (DISPLAY_SETTINGS.oblasts === 'alarm_only' && threat);
         const hasDuration = SETTINGS.timersEnabled && data.alertDuration && (threat || name === 'АР Крим' || name === 'Луганська' || name === 'Донецька');
         const durationClass = threat === 'red' ? 'red-alarm' : (threat === 'yellow' ? 'yellow-alarm' : '');
 
         const icon = L.divIcon({
             className: 'region-badge-marker',
             html: `
-                <div class="region-title-text ${threat ? 'active-alert' : ''}">${name}</div>
+                <div class="region-title-text ${threat ? 'active-alert' : ''}" style="${shouldShowOblast ? '' : 'display:none;'}">${name}</div>
                 ${hasDuration ? `<div class="alarm-duration-badge ${durationClass}">${data.alertDuration}</div>` : ''}
             `,
             iconSize: [120, 36],
@@ -244,11 +332,12 @@ function updateRegionLabels() {
         if (!data) continue;
 
         const threat = activeThreats.get(name);
+        const shouldShowOblast = (DISPLAY_SETTINGS.oblasts === 'all') || (DISPLAY_SETTINGS.oblasts === 'alarm_only' && threat);
         const hasDuration = SETTINGS.timersEnabled && data.alertDuration && (threat || name === 'АР Крим' || name === 'Луганська' || name === 'Донецька');
         const durationClass = threat === 'red' ? 'red-alarm' : (threat === 'yellow' ? 'yellow-alarm' : '');
 
         const newHtml = `
-            <div class="region-title-text ${threat ? 'active-alert' : ''}">${name}</div>
+            <div class="region-title-text ${threat ? 'active-alert' : ''}" style="${shouldShowOblast ? '' : 'display:none;'}">${name}</div>
             ${hasDuration ? `<div class="alarm-duration-badge ${durationClass}">${data.alertDuration}</div>` : ''}
         `;
         marker.setIcon(L.divIcon({
@@ -499,15 +588,82 @@ function setSourceFilter(sourceKey) {
 
 function filterTargetsByActiveSource() {
     tacticalTargets.forEach(t => {
-        const matchesFilter = (activeSourceFilter === 'auto') || (String(t.sourceIndex) === String(activeSourceFilter));
-        if (matchesFilter) {
+        // 1. Перевірка дозволу від адміністратора каналу
+        let allowedByAdmin = true;
+        if (adminBroadcastConfig) {
+            // Фільтр за джерелом
+            if (Array.isArray(adminBroadcastConfig.sources) && !adminBroadcastConfig.sources.includes(Number(t.sourceIndex))) {
+                allowedByAdmin = false;
+            }
+            // Фільтр за типом загрози
+            if (adminBroadcastConfig.threats) {
+                if (t.type === 'shahed' && !adminBroadcastConfig.threats.drones) allowedByAdmin = false;
+                if (t.type === 'ballistic' && !adminBroadcastConfig.threats.missiles) allowedByAdmin = false;
+                if (t.type === 'kab' && !adminBroadcastConfig.threats.kabs) allowedByAdmin = false;
+                if (t.type === 'explosion' && !adminBroadcastConfig.threats.explosions) allowedByAdmin = false;
+            }
+        }
+
+        // 2. Локальний фільтр користувача з верхньої плашки (Авто / 1 / 2 / 3)
+        const matchesSourceFilter = (activeSourceFilter === 'auto') || (String(t.sourceIndex) === String(activeSourceFilter));
+
+        // 3. Локальний фільтр з модального вікна "Відображати на мапі" (плитки загроз)
+        let allowedByTile = true;
+        if (DISPLAY_SETTINGS.threatFilters) {
+            if (t.type === 'shahed' && !DISPLAY_SETTINGS.threatFilters.drones_city) allowedByTile = false;
+            if (t.type === 'ballistic' && !DISPLAY_SETTINGS.threatFilters.missiles && !DISPLAY_SETTINGS.threatFilters.potential) allowedByTile = false;
+            if (t.type === 'kab' && !DISPLAY_SETTINGS.threatFilters.kabs && !DISPLAY_SETTINGS.threatFilters.kabs_mon) allowedByTile = false;
+            if (t.type === 'explosion' && !DISPLAY_SETTINGS.threatFilters.explosions) allowedByTile = false;
+        }
+
+        const isVisible = allowedByAdmin && matchesSourceFilter && allowedByTile;
+
+        if (isVisible) {
             if (!map.hasLayer(t.marker)) map.addLayer(t.marker);
-            if (!map.hasLayer(t.line)) map.addLayer(t.line);
+            if (t.line && !map.hasLayer(t.line)) map.addLayer(t.line);
         } else {
             if (map.hasLayer(t.marker)) map.removeLayer(t.marker);
-            if (map.hasLayer(t.line)) map.removeLayer(t.line);
+            if (t.line && map.hasLayer(t.line)) map.removeLayer(t.line);
         }
     });
+}
+
+function applyAdminConfig(cfg) {
+    if (!cfg) return;
+
+    // Оновлення верхньої плашки джерел для підписників
+    const src1Btn = document.getElementById('src-btn-1');
+    const src2Btn = document.getElementById('src-btn-2');
+    const src3Btn = document.getElementById('src-btn-3');
+
+    if (Array.isArray(cfg.sources)) {
+        if (src1Btn) src1Btn.style.display = cfg.sources.includes(1) ? 'inline-flex' : 'none';
+        if (src2Btn) src2Btn.style.display = cfg.sources.includes(2) ? 'inline-flex' : 'none';
+        if (src3Btn) src3Btn.style.display = cfg.sources.includes(3) ? 'inline-flex' : 'none';
+    }
+
+    filterTargetsByActiveSource();
+}
+
+function loadAdminConfigToUI() {
+    const s1 = document.getElementById('adm-src-1');
+    const s2 = document.getElementById('adm-src-2');
+    const s3 = document.getElementById('adm-src-3');
+    const tm = document.getElementById('adm-threat-missiles');
+    const td = document.getElementById('adm-threat-drones');
+    const tk = document.getElementById('adm-threat-kabs');
+    const te = document.getElementById('adm-threat-exp');
+
+    if (s1 && Array.isArray(adminBroadcastConfig.sources)) s1.checked = adminBroadcastConfig.sources.includes(1);
+    if (s2 && Array.isArray(adminBroadcastConfig.sources)) s2.checked = adminBroadcastConfig.sources.includes(2);
+    if (s3 && Array.isArray(adminBroadcastConfig.sources)) s3.checked = adminBroadcastConfig.sources.includes(3);
+
+    if (adminBroadcastConfig.threats) {
+        if (tm) tm.checked = !!adminBroadcastConfig.threats.missiles;
+        if (td) td.checked = !!adminBroadcastConfig.threats.drones;
+        if (tk) tk.checked = !!adminBroadcastConfig.threats.kabs;
+        if (te) te.checked = !!adminBroadcastConfig.threats.explosions;
+    }
 }
 
 // ==========================================
@@ -556,7 +712,6 @@ function initLiveTimeCounters() {
         }
 
         if (visEl) {
-            // Реалістичне коливання лічильника відвідувачів як на alerts.in.ua
             const baseVis = 39800;
             const delta = Math.floor(Math.sin(Date.now() / 15000) * 850) + (now.getSeconds() * 7);
             const total = (baseVis + delta).toLocaleString('uk-UA');
@@ -654,8 +809,7 @@ function initCombatSceneFromParams() {
         return;
     }
 
-    // За замовчуванням: формуємо реалістичну тактичну обстановку з 3 анонімними джерелами (як на скріншоті)
-    // Активні області з тривогами
+    // Тактична обстановка за замовчуванням
     setOblastThreat('Полтавська', 'red');
     setOblastThreat('Черкаська', 'red');
     setOblastThreat('Кіровоградська', 'red');
@@ -726,6 +880,14 @@ function initLiveAlertsStream() {
 function handleIncomingLivePayload(p) {
     if (!p) return;
 
+    // Синхронізація конфігурації адміністратора для всіх підписників
+    if (p.type === 'ADMIN_CONFIG') {
+        adminBroadcastConfig = Object.assign(adminBroadcastConfig, p);
+        localStorage.setItem('cached_admin_config', JSON.stringify(p));
+        applyAdminConfig(p);
+        return;
+    }
+
     if (Array.isArray(p.activeRegions)) {
         clearAllThreats();
         p.activeRegions.forEach(r => setOblastThreat(r, 'red'));
@@ -752,7 +914,7 @@ function handleIncomingLivePayload(p) {
 // 11. ПОДІЇ КНОПОК ТА НАЛАШТУВАННЯ
 // ==========================================
 function setupUIEvents() {
-    // Перемикач джерел у верхній панелі
+    // 1. Верхня панель вибору джерела
     document.querySelectorAll('.source-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const src = btn.getAttribute('data-source');
@@ -760,15 +922,13 @@ function setupUIEvents() {
         });
     });
 
-    // Панель інструментів (Side Toolbar)
-    const btnMenu = document.getElementById('btn-menu');
+    // 2. Панель інструментів (Side Toolbar)
     const btnSound = document.getElementById('btn-sound');
     const iconSoundOn = document.getElementById('icon-sound-on');
     const iconSoundOff = document.getElementById('icon-sound-off');
     const btnSettings = document.getElementById('btn-settings');
     const btnCenter = document.getElementById('btn-center');
     const btnLayers = document.getElementById('btn-layers');
-    const btnLang = document.getElementById('btn-lang');
 
     if (btnSound) {
         btnSound.addEventListener('click', () => {
@@ -778,8 +938,6 @@ function setupUIEvents() {
                 iconSoundOn.classList.toggle('hidden', !SETTINGS.soundEnabled);
                 iconSoundOff.classList.toggle('hidden', SETTINGS.soundEnabled);
             }
-            const chk = document.getElementById('setting-sound');
-            if (chk) chk.checked = SETTINGS.soundEnabled;
             if (SETTINGS.soundEnabled) playTacticalBeep(600);
         });
     }
@@ -807,7 +965,7 @@ function setupUIEvents() {
         });
     }
 
-    // Модальне вікно налаштувань
+    // 3. Модальне вікно налаштувань
     const settingsModal = document.getElementById('settings-modal');
     const closeSettingsBtn = document.getElementById('close-settings-btn');
 
@@ -833,50 +991,148 @@ function setupUIEvents() {
         });
     }
 
-    // Чекбокси налаштувань
-    const setAnim = document.getElementById('setting-anim');
-    if (setAnim) {
-        setAnim.addEventListener('change', (e) => {
-            SETTINGS.animationsEnabled = e.target.checked;
-        });
-    }
+    // 4. Перемикання вкладок у модальному вікні
+    document.querySelectorAll('.settings-tab-btn').forEach(tabBtn => {
+        tabBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            const targetTab = tabBtn.getAttribute('data-tab');
 
-    const setRadar = document.getElementById('setting-radar');
-    if (setRadar) {
-        setRadar.addEventListener('change', (e) => {
-            SETTINGS.radarPingsEnabled = e.target.checked;
-            document.querySelectorAll('.radar-pulse-ring').forEach(r => {
-                r.style.display = SETTINGS.radarPingsEnabled ? 'block' : 'none';
-            });
-        });
-    }
+            document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.settings-tab-pane').forEach(p => p.classList.remove('active'));
 
-    const setSound = document.getElementById('setting-sound');
-    if (setSound) {
-        setSound.addEventListener('change', (e) => {
-            SETTINGS.soundEnabled = e.target.checked;
-            if (iconSoundOn && iconSoundOff) {
-                iconSoundOn.classList.toggle('hidden', !SETTINGS.soundEnabled);
-                iconSoundOff.classList.toggle('hidden', SETTINGS.soundEnabled);
+            tabBtn.classList.add('active');
+            const pane = document.getElementById(targetTab);
+            if (pane) pane.classList.add('active');
+        });
+    });
+
+    // 5. Перемикання тем оформлення (Скріншот 2)
+    document.querySelectorAll('.theme-thumb-card').forEach(card => {
+        card.addEventListener('click', () => {
+            triggerHaptic('light');
+            document.querySelectorAll('.theme-thumb-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            const theme = card.getAttribute('data-theme') || 'dark';
+            DISPLAY_SETTINGS.theme = theme;
+            document.body.setAttribute('data-theme', theme);
+        });
+    });
+
+    // 6. Плитки загроз (Скріншот 2)
+    document.querySelectorAll('.threat-tile').forEach(tile => {
+        tile.addEventListener('click', () => {
+            triggerHaptic('light');
+            tile.classList.toggle('active');
+            const threatKey = tile.getAttribute('data-threat');
+            if (DISPLAY_SETTINGS.threatFilters) {
+                DISPLAY_SETTINGS.threatFilters[threatKey] = tile.classList.contains('active');
             }
-            if (SETTINGS.soundEnabled) playTacticalBeep(600);
+            filterTargetsByActiveSource();
         });
-    }
+    });
 
-    const setTimers = document.getElementById('setting-timers');
-    if (setTimers) {
-        setTimers.addEventListener('change', (e) => {
-            SETTINGS.timersEnabled = e.target.checked;
+    // 7. Радіокнопки географії (Скріншот 1)
+    document.querySelectorAll('input[name="opt-districts"]').forEach(r => {
+        r.addEventListener('change', (e) => {
+            triggerHaptic('light');
+            DISPLAY_SETTINGS.districts = e.target.value;
             updateRegionLabels();
         });
+    });
+
+    document.querySelectorAll('input[name="opt-cities"]').forEach(r => {
+        r.addEventListener('change', (e) => {
+            triggerHaptic('light');
+            DISPLAY_SETTINGS.cities = e.target.value;
+            updateRegionLabels();
+        });
+    });
+
+    document.querySelectorAll('input[name="opt-oblasts"]').forEach(r => {
+        r.addEventListener('change', (e) => {
+            triggerHaptic('light');
+            DISPLAY_SETTINGS.oblasts = e.target.value;
+            updateRegionLabels();
+        });
+    });
+
+    // 8. Кнопки інтервалів затемнення кольору за тривалістю (Скріншот 1)
+    document.querySelectorAll('.interval-btn').forEach(intBtn => {
+        intBtn.addEventListener('click', () => {
+            triggerHaptic('light');
+            document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+            intBtn.classList.add('active');
+            DISPLAY_SETTINGS.darkenInterval = parseInt(intBtn.getAttribute('data-val'), 10) || 0;
+            refreshAllOblastStyles();
+        });
+    });
+
+    // 9. Авторизація та Керування Адміністратора
+    const isAdmin = checkIfAdmin();
+    const adminBadge = document.getElementById('admin-badge-indicator');
+    const tabBtnAdmin = document.getElementById('tab-btn-admin');
+
+    if (isAdmin) {
+        if (adminBadge) {
+            adminBadge.classList.remove('hidden');
+            adminBadge.addEventListener('click', () => {
+                triggerHaptic('medium');
+                settingsModal?.classList.remove('hidden');
+                tabBtnAdmin?.click();
+            });
+        }
+        loadAdminConfigToUI();
+    } else {
+        if (adminBadge) adminBadge.classList.add('hidden');
     }
 
-    const setSpeed = document.getElementById('setting-speed');
-    if (setSpeed) {
-        setSpeed.addEventListener('change', (e) => {
-            SETTINGS.simSpeed = Number(e.target.value) || 2;
+    // 10. Збереження та трансляція конфігурації підписникам від адміна
+    const saveAdminBtn = document.getElementById('btn-save-admin-sources');
+    if (saveAdminBtn) {
+        saveAdminBtn.addEventListener('click', async () => {
+            triggerHaptic('heavy');
+            const statusEl = document.getElementById('admin-broadcast-status');
+            if (statusEl) statusEl.innerText = '⏳ Трансляція конфігурації всім підписникам...';
+
+            const newConfig = {
+                type: 'ADMIN_CONFIG',
+                sources: [
+                    document.getElementById('adm-src-1')?.checked ? 1 : null,
+                    document.getElementById('adm-src-2')?.checked ? 2 : null,
+                    document.getElementById('adm-src-3')?.checked ? 3 : null
+                ].filter(Boolean),
+                threats: {
+                    missiles: !!document.getElementById('adm-threat-missiles')?.checked,
+                    drones: !!document.getElementById('adm-threat-drones')?.checked,
+                    kabs: !!document.getElementById('adm-threat-kabs')?.checked,
+                    explosions: !!document.getElementById('adm-threat-exp')?.checked
+                },
+                updatedAt: Date.now()
+            };
+
+            adminBroadcastConfig = newConfig;
+            localStorage.setItem('admin_broadcast_config', JSON.stringify(newConfig));
+
+            try {
+                await fetch(`https://ntfy.sh/${LIVE_CHANNEL}`, {
+                    method: 'POST',
+                    body: JSON.stringify(newConfig),
+                    headers: { 'Title': 'ADMIN_CONFIG', 'Priority': 'high' }
+                });
+                if (statusEl) {
+                    statusEl.innerText = '✅ Успішно! Зміни транслюються всім підписникам наживо.';
+                    setTimeout(() => { if (statusEl) statusEl.innerText = ''; }, 4000);
+                }
+            } catch (err) {
+                if (statusEl) statusEl.innerText = '✅ Збережено локально (помилка прямої відправки).';
+            }
+
+            applyAdminConfig(newConfig);
         });
     }
+
+    // Застосовуємо конфігурацію джерел
+    applyAdminConfig(adminBroadcastConfig);
 }
 
 // ==========================================

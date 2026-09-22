@@ -561,67 +561,394 @@ html, body {
     to { opacity: 1; }
 }
 
+/* Модальне вікно налаштувань ( alerts.in.ua стиль ) */
 .settings-dialog {
-    background: rgba(18, 22, 29, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 16px;
+    background: #151922;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
     width: 100%;
-    max-width: 420px;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8);
+    max-width: 460px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .settings-dialog-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px 18px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 10px 14px 0 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: #11141b;
 }
 
-.settings-dialog-header h3 {
-    font-size: 15px;
-    font-weight: 700;
+.header-tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.header-tabs::-webkit-scrollbar { display: none; }
+
+.settings-tab-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 12px;
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.settings-tab-btn:hover {
+    color: #f1f5f9;
+}
+
+.settings-tab-btn.active {
     color: #fff;
+}
+
+.settings-tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 8px;
+    right: 8px;
+    height: 3px;
+    background: #eab308;
+    border-radius: 3px 3px 0 0;
 }
 
 .settings-close-btn {
     background: transparent;
     border: none;
     color: #94a3b8;
-    font-size: 22px;
+    font-size: 24px;
     cursor: pointer;
     line-height: 1;
+    padding: 4px 8px;
 }
 
 .settings-close-btn:hover { color: #fff; }
 
 .settings-dialog-body {
-    padding: 16px 18px;
+    padding: 14px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    max-height: 70vh;
+    gap: 12px;
+    max-height: 75vh;
     overflow-y: auto;
 }
 
-.setting-row {
+.settings-tab-pane {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.settings-tab-pane.active {
+    display: flex;
+}
+
+/* Картки секцій налаштувань */
+.settings-card-box {
+    background: #1a1f2c;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+/* Скрол тем (як на alerts.in.ua скріншот 2) */
+.themes-scroll-row {
+    display: flex;
+    gap: 10px;
+}
+
+.theme-thumb-card {
+    flex: 1;
+    background: #11141b;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 6px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.theme-thumb-card.active {
+    border-color: #eab308;
+}
+
+.thumb-preview {
+    height: 34px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+}
+
+.theme-dark-preview { background: linear-gradient(135deg, #101216 0%, #1e293b 100%); }
+.theme-pitch-preview { background: linear-gradient(135deg, #020617 0%, #0f172a 100%); }
+.theme-contrast-preview { background: linear-gradient(135deg, #000000 0%, #1e1b4b 100%); }
+
+.thumb-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+/* Секція джерел та сітка плиток загроз (Скріншот 2) */
+.source-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.src-icon { font-size: 16px; }
+.src-title { font-size: 13px; font-weight: 700; color: #f8fafc; }
+
+.threat-tiles-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.threat-tile {
+    background: #222938;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.15s ease;
+}
+
+.threat-tile.active {
+    border-bottom: 3px solid #eab308;
+    background: #252e40;
+}
+
+.threat-tile:hover {
+    background: #2b3549;
+}
+
+.tile-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.tile-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: #e2e8f0;
+    line-height: 1.25;
+}
+
+/* Скріншот 1: Географія та кольори */
+.settings-warning-banner {
+    background: rgba(234, 179, 8, 0.12);
+    border: 1px solid rgba(234, 179, 8, 0.35);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #fef08a;
+    font-weight: 500;
+    text-align: center;
+}
+
+.group-question {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 8px;
+}
+
+.group-subdesc {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: -4px;
+    margin-bottom: 10px;
+}
+
+.radio-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.radio-option-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 4px 2px;
+}
+
+.radio-option-item input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #64748b;
+    border-radius: 50%;
+    outline: none;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.radio-option-item input[type="radio"]:checked {
+    border-color: #eab308;
+}
+
+.radio-option-item input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #eab308;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.radio-text {
+    font-size: 13px;
+    color: #cbd5e1;
+    font-weight: 500;
+}
+
+/* Кнопки інтервалів тривалості (Скріншот 1) */
+.intervals-btn-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.interval-btn {
+    background: #222938;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    border-radius: 8px;
+    padding: 8px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+
+.interval-btn:hover {
+    color: #fff;
+    background: #2b3549;
+}
+
+.interval-btn.active {
+    background: #eab308;
+    color: #0f172a;
+    border-color: #eab308;
+    font-weight: 700;
+}
+
+/* Вкладка Адміна */
+.admin-badge-pill {
+    background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+    color: #0f172a;
+    font-weight: 800;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+}
+
+.admin-hero-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid rgba(234, 179, 8, 0.4);
+}
+
+.admin-hero-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #fef08a;
+    margin-bottom: 4px;
+}
+
+.admin-hero-desc {
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.4;
+}
+
+.admin-switches-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.admin-switch-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.admin-switch-row:last-child { border-bottom: none; }
+
+.admin-switch-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
-.setting-title {
+.admin-switch-name {
     font-size: 13px;
     font-weight: 600;
     color: #f1f5f9;
 }
 
-.setting-desc {
+.admin-switch-hint {
     font-size: 11px;
     color: #94a3b8;
-    margin-top: 1px;
+}
+
+.admin-save-broadcast-btn {
+    background: linear-gradient(135deg, #eab308 0%, #d97706 100%);
+    color: #0f172a;
+    border: none;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(234, 179, 8, 0.3);
+    transition: all 0.2s ease;
+    margin-top: 6px;
+}
+
+.admin-save-broadcast-btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+.admin-save-broadcast-btn:active {
+    transform: translateY(1px);
+}
+
+.admin-save-status {
+    font-size: 12px;
+    font-weight: 600;
+    color: #22c55e;
+    text-align: center;
+    min-height: 18px;
 }
 
 /* Тумблери-перемикачі */
@@ -661,7 +988,7 @@ html, body {
 }
 
 input:checked + .slider {
-    background-color: #2563eb;
+    background-color: #eab308;
 }
 
 input:checked + .slider:before {

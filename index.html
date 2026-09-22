@@ -17,11 +17,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="style.css?v=6.0" />
+    <link rel="stylesheet" href="style.css?v=7.0" />
 </head>
 <body data-theme="dark">
 
-    <!-- Верхня панель вибору джерела (точно як на скріншоті) -->
+    <!-- Верхня панель вибору джерела (точно як на alerts.in.ua) -->
     <div class="top-source-bar" id="top-source-bar">
         <span class="source-bar-title">Рух об'єктів:</span>
         <button class="source-btn active" data-source="auto" id="src-btn-auto">
@@ -40,6 +40,7 @@
             <span class="source-dot"></span> Джерело 3
         </button>
         <span class="source-pipe">|</span>
+        <span id="admin-badge-indicator" class="admin-badge-pill hidden">👑 АДМІН</span>
     </div>
 
     <!-- Leaflet Map Container -->
@@ -72,20 +73,20 @@
         </button>
     </div>
 
-    <!-- Нижня ліва плашка зі статусом (як на скріншоті) -->
+    <!-- Нижня ліва плашка зі статусом -->
     <div class="bottom-left-widget">
         <div class="widget-row-title">
             <span class="ua-flag-icon">🇺🇦</span> <b>Мапа тривог</b>
         </div>
         <div class="widget-row-time" id="status-time-str">
-            Станом на: 22 вересня о 03:45 (1672 день)
+            Станом на: 22 вересня о 04:50 (1672 день)
         </div>
         <div class="widget-row-live">
             <span class="live-status-dot"></span> Наживо: <span class="visitors-num" id="live-visitors">👥 41 820</span>
         </div>
     </div>
 
-    <!-- Нижня права легенда (точна копія скріншоту alerts.in.ua) -->
+    <!-- Нижня права легенда (alerts.in.ua) -->
     <div class="bottom-right-legend" id="map-legend">
         <div class="legend-row">
             <span class="legend-box alert-red"></span>
@@ -133,86 +134,290 @@
         </div>
     </div>
 
-    <!-- Інтерактивне вікно налаштувань (⚙️) -->
+    <!-- ПОВНОЦІННЕ МОДАЛЬНЕ ВІКНО НАЛАШТУВАНЬ (ТОЧНО ЗА СКРІНШОТАМИ) -->
     <div class="modal-backdrop hidden" id="settings-modal">
         <div class="settings-dialog">
             <div class="settings-dialog-header">
-                <h3>⚙️ Налаштування карти</h3>
+                <div class="header-tabs">
+                    <button class="settings-tab-btn active" data-tab="tab-threats">Відображати на мапі</button>
+                    <button class="settings-tab-btn" data-tab="tab-display">Географія та кольори</button>
+                    <button class="settings-tab-btn" data-tab="tab-admin" id="tab-btn-admin">👑 Для адміна</button>
+                </div>
                 <button class="settings-close-btn" id="close-settings-btn">&times;</button>
             </div>
+
             <div class="settings-dialog-body">
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <div class="setting-title">Анімація руху об'єктів</div>
-                        <div class="setting-desc">Плавний політ цілей за секторами та векторами</div>
+
+                <!-- ВКЛАДКА 1: ВІДОБРАЖАТИ НА МАПІ (СКРІНШОТ 2) -->
+                <div class="settings-tab-pane active" id="tab-threats">
+                    <!-- Теми зверху -->
+                    <div class="settings-card-box">
+                        <div class="themes-scroll-row">
+                            <div class="theme-thumb-card active" data-theme="dark">
+                                <div class="thumb-preview theme-dark-preview"></div>
+                                <span class="thumb-label">Класична</span>
+                            </div>
+                            <div class="theme-thumb-card" data-theme="pitch">
+                                <div class="thumb-preview theme-pitch-preview"></div>
+                                <span class="thumb-label">Нічна</span>
+                            </div>
+                            <div class="theme-thumb-card" data-theme="contrast">
+                                <div class="thumb-preview theme-contrast-preview"></div>
+                                <span class="thumb-label">Контраст</span>
+                            </div>
+                        </div>
+                        <label class="checkbox-line" style="margin-top: 10px;">
+                            <input type="checkbox" id="chk-auto-theme" checked>
+                            <span>Автоматичне перемикання теми</span>
+                        </label>
                     </div>
-                    <label class="switch">
-                        <input type="checkbox" id="setting-anim" checked>
-                        <span class="slider round"></span>
-                    </label>
+
+                    <!-- Секція "Офіційні джерела" (Джерело 1) -->
+                    <div class="settings-card-box">
+                        <div class="source-section-header">
+                            <span class="src-icon">🛡️</span>
+                            <span class="src-title">Офіційні джерела (Повітряні сили ЗСУ)</span>
+                        </div>
+                        <div class="threat-tiles-grid">
+                            <div class="threat-tile active" data-threat="reasons">
+                                <span class="tile-icon">✈️</span>
+                                <span class="tile-title">Причини тривог</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="potential">
+                                <span class="tile-icon">🚀</span>
+                                <span class="tile-title">Потенційні загрози</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="art">
+                                <span class="tile-icon">💥</span>
+                                <span class="tile-title">Загроза артобстрілу</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="missiles">
+                                <span class="tile-icon">✈️</span>
+                                <span class="tile-title">Рух ракет</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="kabs">
+                                <span class="tile-icon">💣</span>
+                                <span class="tile-title">Керовані авіаційні бомби</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="highdanger">
+                                <span class="tile-icon">⚠️</span>
+                                <span class="tile-title">Підвищена небезпека</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Секція "Моніторингові канали" (Джерела 2 & 3) -->
+                    <div class="settings-card-box">
+                        <div class="source-section-header">
+                            <span class="src-icon">📡</span>
+                            <span class="src-title">Моніторингові канали (Оперативні радари)</span>
+                        </div>
+                        <div class="threat-tiles-grid">
+                            <div class="threat-tile active" data-threat="explosions">
+                                <span class="tile-icon">💥</span>
+                                <span class="tile-title">Вибухи</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="strikes">
+                                <span class="tile-icon">🎯</span>
+                                <span class="tile-title">Обстріли</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="works">
+                                <span class="tile-icon">⚠️</span>
+                                <span class="tile-title">Вибухові/підривні роботи</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="drones_city">
+                                <span class="tile-icon">🔻</span>
+                                <span class="tile-title">БпЛА в напрямку міста</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="kabs_mon">
+                                <span class="tile-icon">💣</span>
+                                <span class="tile-title">Керовані авіаційні бомби</span>
+                            </div>
+                            <div class="threat-tile active" data-threat="danger_mon">
+                                <span class="tile-icon">⚠️</span>
+                                <span class="tile-title">Підвищена небезпека</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <div class="setting-title">Радарні хвилі та імпульси</div>
-                        <div class="setting-desc">Пульсуючі кола навколо виявлених цілей</div>
+                <!-- ВКЛАДКА 2: ГЕОГРАФІЯ ТА КОЛЬОРИ (СКРІНШОТ 1) -->
+                <div class="settings-tab-pane" id="tab-display">
+                    <div class="settings-warning-banner">
+                        <span>Ця функція може гальмувати на деяких пристроях ⚠️</span>
                     </div>
-                    <label class="switch">
-                        <input type="checkbox" id="setting-radar" checked>
-                        <span class="slider round"></span>
-                    </label>
+
+                    <!-- Райони -->
+                    <div class="settings-card-box">
+                        <div class="group-question">Відображати назви районів на мапі?</div>
+                        <div class="radio-options-list">
+                            <label class="radio-option-item">
+                                <input type="radio" name="opt-districts" value="all" checked>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">Так</span>
+                            </label>
+                            <label class="radio-option-item">
+                                <input type="radio" name="opt-districts" value="alarm_only">
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">Лише районів в яких оголошена тривога</span>
+                            </label>
+                            <label class="radio-option-item">
+                                <input type="radio" name="opt-districts" value="district_alarm_only">
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">Якщо тривога оголошена лише в районі, але не в області</span>
+                            </label>
+                            <label class="radio-option-item">
+                                <input type="radio" name="opt-districts" value="none">
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">Ні</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Міста та громади -->
+                    <div class="settings-card-box">
+                        <div class="group-question">Відображати назви міст та громад на мапі?</div>
+                        <div class="radio-options-list">
+                            <label class="radio-option-item">
+                                <input type="radio" name="opt-cities" value="threat_only" checked>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">Якщо є окрема тривога чи загроза в місті чи громаді</span>
+                            </label>
+                            <label class="radio-option-item">
+                                <input type="radio" name="opt-cities" value="none">
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">Ні</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Області -->
+                    <div class="settings-card-box">
+                        <div class="group-question">Відображати назви областей на мапі?</div>
+                        <div class="radio-options-list">
+                            <label class="radio-option-item">
+                                <input type="radio" name="opt-oblasts" value="all" checked>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">Так</span>
+                            </label>
+                            <label class="radio-option-item">
+                                <input type="radio" name="opt-oblasts" value="alarm_only">
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">Лише областей в яких тривога</span>
+                            </label>
+                            <label class="radio-option-item">
+                                <input type="radio" name="opt-oblasts" value="none">
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">Ні</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Зміна кольору тривоги за тривалістю -->
+                    <div class="settings-card-box">
+                        <div class="group-question">Чи змінювати колір активної тривоги в залежності від її тривалості?</div>
+                        <div class="group-subdesc">Темніший колір — довше триває тривога</div>
+                        <div class="intervals-btn-grid">
+                            <button class="interval-btn" data-val="0">Не змінювати</button>
+                            <button class="interval-btn" data-val="15">15хв тривоги</button>
+                            <button class="interval-btn active" data-val="30">30хв тривоги</button>
+                            <button class="interval-btn" data-val="45">45хв тривоги</button>
+                            <button class="interval-btn" data-val="60">60хв тривоги</button>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <div class="setting-title">Звукові сповіщення</div>
-                        <div class="setting-desc">Тактичний звуковий сигнал при появі нової загрози</div>
+                <!-- ВКЛАДКА 3: ПАНЕЛЬ АДМІНІСТРАТОРА (ВИБІР ДЖЕРЕЛ ДЛЯ ПІДПИСНИКІВ) -->
+                <div class="settings-tab-pane" id="tab-admin">
+                    <div class="settings-card-box admin-hero-card">
+                        <div class="admin-hero-title">👑 Керування джерелами для підписників</div>
+                        <div class="admin-hero-desc">
+                            Оберіть, які джерела інформації та типи загроз транслюються в прямому ефірі на карти всіх підписників каналу:
+                        </div>
                     </div>
-                    <label class="switch">
-                        <input type="checkbox" id="setting-sound">
-                        <span class="slider round"></span>
-                    </label>
+
+                    <!-- Джерела -->
+                    <div class="settings-card-box">
+                        <div class="group-question">Активні джерела на каналі:</div>
+                        <div class="admin-switches-list">
+                            <div class="admin-switch-row">
+                                <div class="admin-switch-info">
+                                    <div class="admin-switch-name">🛡️ Джерело 1 (Повітряні сили ЗСУ)</div>
+                                    <div class="admin-switch-hint">Офіційні пуски, балістика, стратегічна авіація</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="adm-src-1" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+
+                            <div class="admin-switch-row">
+                                <div class="admin-switch-info">
+                                    <div class="admin-switch-name">📡 Джерело 2 (Секторальний радар району)</div>
+                                    <div class="admin-switch-hint">Павлиш, Градизьк, Світловодськ, підступи</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="adm-src-2" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+
+                            <div class="admin-switch-row">
+                                <div class="admin-switch-info">
+                                    <div class="admin-switch-name">📡 Джерело 3 (Оперативний моніторинг)</div>
+                                    <div class="admin-switch-hint">Рух цілей, звуки, фіксація швидкісних загроз</div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="adm-src-3" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Типи загроз -->
+                    <div class="settings-card-box">
+                        <div class="group-question">Транслювати підписникам типи загроз:</div>
+                        <div class="admin-switches-list">
+                            <div class="admin-switch-row">
+                                <div class="admin-switch-info">
+                                    <div class="admin-switch-name">🚀 Ракети та балістика</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="adm-threat-missiles" checked><span class="slider round"></span></label>
+                            </div>
+                            <div class="admin-switch-row">
+                                <div class="admin-switch-info">
+                                    <div class="admin-switch-name">🔻 Шахеди / Ударні БпЛА</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="adm-threat-drones" checked><span class="slider round"></span></label>
+                            </div>
+                            <div class="admin-switch-row">
+                                <div class="admin-switch-info">
+                                    <div class="admin-switch-name">💣 Керовані авіабомби (КАБ)</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="adm-threat-kabs" checked><span class="slider round"></span></label>
+                            </div>
+                            <div class="admin-switch-row">
+                                <div class="admin-switch-info">
+                                    <div class="admin-switch-name">💥 Вибухи та робота ППО</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="adm-threat-exp" checked><span class="slider round"></span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="admin-save-broadcast-btn" id="btn-save-admin-sources">
+                        💾 Застосувати та транслювати всім підписникам
+                    </button>
+                    <div id="admin-broadcast-status" class="admin-save-status"></div>
                 </div>
 
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <div class="setting-title">Таймери тривалості тривоги</div>
-                        <div class="setting-desc">Показувати час активної тривоги над областю</div>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="setting-timers" checked>
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <div class="setting-title">Швидкість анімації польоту</div>
-                        <div class="setting-desc">Коефіцієнт швидкості руху маркерів цілей</div>
-                    </div>
-                    <select id="setting-speed" class="custom-select">
-                        <option value="1">1x (Звичайна)</option>
-                        <option value="2" selected>2x (Швидка)</option>
-                        <option value="3">3x (Тактичний огляд)</option>
-                    </select>
-                </div>
-
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <div class="setting-title">Візуальна тема</div>
-                        <div class="setting-desc">Стиль підкладки карти</div>
-                    </div>
-                    <select id="setting-theme" class="custom-select">
-                        <option value="dark" selected>alerts.in.ua (Темна)</option>
-                        <option value="pitch">Глибока ніч</option>
-                    </select>
-                </div>
             </div>
         </div>
     </div>
 
     <!-- Leaflet.js -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="app.js?v=6.0"></script>
+    <script src="app.js?v=7.0"></script>
 </body>
 </html>
